@@ -1,0 +1,2730 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<title>Tečkovník</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Tečkovník">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#F6F8FA" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#14171B" media="(prefers-color-scheme: dark)">
+<script src="config.js"></script>
+<script src="vendor/supabase.js"></script>
+<script src="pwa.js"></script>
+<script>if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+  --paper:#F6F8FA; --dot:#A9B4C2; --ink:#18202B;
+  --chrome:rgba(255,255,255,.95); --chrome-2:#EEF2F6; --line:#D6DDE6;
+  --text:#18202B; --muted:#5B6878; --accent:#B05E25; --accent-soft:#F5E6DA;
+  --ok:#2C8A55; --bad:#C23B2E; --hl-blend:multiply;
+  --shadow:0 8px 28px rgba(18,28,42,.13),0 1px 3px rgba(18,28,42,.08);
+  --font:'Barlow',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#14171B; --dot:#3B444F; --ink:#E7EBF0;
+    --chrome:rgba(30,35,42,.95); --chrome-2:#272D35; --line:#353D47;
+    --text:#E7EBF0; --muted:#98A3B1; --accent:#E2894A; --accent-soft:#3A2A1E;
+    --ok:#4CC37F; --bad:#F06A5C; --hl-blend:screen;
+    --shadow:0 8px 28px rgba(0,0,0,.45),0 1px 3px rgba(0,0,0,.3);
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#14171B; --dot:#3B444F; --ink:#E7EBF0;
+  --chrome:rgba(30,35,42,.95); --chrome-2:#272D35; --line:#353D47;
+  --text:#E7EBF0; --muted:#98A3B1; --accent:#E2894A; --accent-soft:#3A2A1E;
+  --ok:#4CC37F; --bad:#F06A5C; --hl-blend:screen;
+  --shadow:0 8px 28px rgba(0,0,0,.45),0 1px 3px rgba(0,0,0,.3);
+}
+*,*::before,*::after{box-sizing:inherit}
+html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;height:100%;overflow:hidden;background:var(--paper);color:var(--text);font-family:var(--font);
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;overscroll-behavior:none;-webkit-tap-highlight-color:transparent}
+#stage{position:fixed;inset:0;touch-action:none}
+#cv{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;display:block}
+
+/* top bar */
+#top{position:fixed;top:0;left:0;right:0;padding:calc(env(safe-area-inset-top,0px) + 10px) 12px 0;display:flex;justify-content:space-between;align-items:flex-start;gap:8px;pointer-events:none;z-index:20}
+.panel{pointer-events:auto;background:var(--chrome);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);display:flex;align-items:center;-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+.ib{width:44px;height:44px;display:grid;place-items:center;border-radius:10px;color:var(--text)}
+.ib:active{background:var(--chrome-2)}
+.ib[disabled]{opacity:.35;cursor:default}
+#titleBtn{height:44px;padding:0 14px 0 4px;font-weight:600;font-size:17px;max-width:42vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#right{gap:2px;padding-right:6px}
+#sync{display:flex;align-items:center;gap:7px;padding:0 10px;font-size:14px;color:var(--muted);height:44px;white-space:nowrap}
+#sync i{width:8px;height:8px;border-radius:50%;background:var(--muted);display:block;flex:none}
+#sync[data-s="saved"] i{background:var(--ok)}
+#sync[data-s="saving"] i{background:var(--accent)}
+#sync[data-s="error"] i,#sync[data-s="ro"] i{background:var(--bad)}
+#zoomBtn{height:44px;min-width:58px;padding:0 8px;font-size:15px;font-variant-numeric:tabular-nums;border-radius:10px}
+#peers{display:flex;align-items:center;padding-left:4px}
+.av{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-size:13px;font-weight:700;color:#fff;border:2px solid var(--chrome);margin-left:-8px}
+.av:first-child{margin-left:0}
+.sep{width:1px;height:26px;background:var(--line);margin:0 4px;flex:none}
+
+/* bottom tray */
+#bottom{position:fixed;left:0;right:0;bottom:0;padding:0 10px calc(env(safe-area-inset-bottom,0px) + 12px);display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none;z-index:20}
+#tray{padding:5px;gap:2px;max-width:100%;overflow-x:auto;scrollbar-width:none}
+#tray::-webkit-scrollbar{display:none}
+.tool{position:relative}
+.tool[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent)}
+.tool[aria-pressed="true"]::after{content:"";position:absolute;left:14px;right:14px;bottom:4px;height:2px;border-radius:2px;background:var(--accent)}
+.sw{width:34px;height:44px;display:grid;place-items:center;flex:none}
+.sw span{width:22px;height:22px;border-radius:50%;display:block;box-shadow:inset 0 0 0 1px rgba(0,0,0,.15)}
+.sw[aria-pressed="true"] span{box-shadow:0 0 0 2px var(--chrome),0 0 0 4px var(--accent)}
+.wd{width:34px;height:44px;display:grid;place-items:center;flex:none;border-radius:10px}
+.wd span{display:block;border-radius:50%;background:var(--text)}
+.wd[aria-pressed="true"]{background:var(--accent-soft)}
+.wd[aria-pressed="true"] span{background:var(--accent)}
+#selbar{padding:4px;gap:2px;display:none}
+#selbar.on{display:flex}
+#selbar .lbl{font-size:14px;color:var(--muted);padding:0 10px 0 8px;white-space:nowrap}
+
+/* popover */
+#pop{position:fixed;z-index:30;right:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 74px);width:min(320px,calc(100vw - 24px));padding:8px;flex-direction:column;align-items:stretch;display:none}
+#pop.on{display:flex}
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:46px;padding:0 8px;font-size:16px}
+.row small{display:block;color:var(--muted);font-size:13px;line-height:1.3}
+.tg{width:48px;height:28px;border-radius:14px;background:var(--line);position:relative;flex:none;transition:background .15s}
+.tg::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.3);transition:transform .15s}
+.tg[aria-checked="true"]{background:var(--accent)}
+.tg[aria-checked="true"]::after{transform:translateX(20px)}
+.seg{display:flex;background:var(--chrome-2);border-radius:9px;padding:2px}
+.seg button{padding:6px 10px;border-radius:7px;font-size:14px}
+#acct .row button.btn{height:38px;padding:0 12px;font-size:14px;flex:none}
+#acct .row{border-top:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--chrome);box-shadow:0 1px 2px rgba(0,0,0,.12);font-weight:600}
+
+/* drawer */
+#drawer{position:fixed;z-index:40;top:0;bottom:0;left:0;width:min(320px,86vw);background:var(--chrome);border-right:1px solid var(--line);box-shadow:var(--shadow);
+  padding:calc(env(safe-area-inset-top,0px) + 14px) 10px calc(env(safe-area-inset-bottom,0px) + 14px);transform:translateX(-105%);transition:transform .22s ease;display:flex;flex-direction:column;-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+#drawer.on{transform:none}
+#scrim{position:fixed;inset:0;z-index:35;background:rgba(10,14,20,.25);display:none}
+#scrim.on{display:block}
+#drawer h2{margin:4px 8px 12px;font-size:22px;font-weight:700;letter-spacing:-.01em}
+#pageList{flex:1;overflow-y:auto;margin:0 -2px;padding:0 2px}
+.pg{display:flex;align-items:center;border-radius:10px;min-height:48px}
+.pg.cur{background:var(--accent-soft)}
+.pg .nm{flex:1;text-align:left;padding:0 10px;height:48px;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pg.cur .nm{color:var(--accent);font-weight:600}
+.pg .ib{width:40px;height:40px;color:var(--muted)}
+#addPage{margin-top:10px;height:48px;border-radius:10px;border:1.5px dashed var(--line);display:flex;align-items:center;justify-content:center;gap:8px;font-weight:600;color:var(--muted)}
+
+/* text editor */
+#ta{position:fixed;z-index:15;display:none;background:transparent;border:1.5px dashed var(--accent);border-radius:4px;outline:none;resize:none;overflow:hidden;
+  font-family:var(--font);font-weight:500;line-height:1.3;padding:0;margin:0;white-space:pre;color:var(--ink);transform-origin:0 0;-webkit-user-select:text;user-select:text;min-width:40px}
+
+/* toast + dialog */
+#toast{position:fixed;z-index:60;left:50%;top:calc(env(safe-area-inset-top,0px) + 66px);transform:translate(-50%,-8px);opacity:0;pointer-events:none;
+  background:var(--text);color:var(--paper);padding:10px 16px;border-radius:10px;font-size:15px;font-weight:500;transition:opacity .18s,transform .18s;max-width:90vw;text-align:center}
+#toast.on{opacity:1;transform:translate(-50%,0)}
+#dlg{position:fixed;inset:0;z-index:70;display:none;align-items:center;justify-content:center;background:rgba(10,14,20,.3);padding:20px}
+#dlg.on{display:flex}
+#dlgBox{width:min(400px,100%);padding:18px;flex-direction:column;align-items:stretch;gap:12px}
+#dlgBox h3{margin:0;font-size:19px}
+#dlgBox p{margin:0;color:var(--muted);font-size:15px;line-height:1.4}
+#dlgIn{font:inherit;font-size:17px;padding:10px 12px;border-radius:9px;border:1px solid var(--line);background:var(--paper);color:var(--text);-webkit-user-select:text;user-select:text;width:100%}
+.btns{display:flex;justify-content:flex-end;gap:8px}
+.btn{height:42px;padding:0 16px;border-radius:9px;font-weight:600;background:var(--chrome-2)}
+.btn.pri{background:var(--accent);color:#fff}
+.btn.danger{background:var(--bad);color:#fff}
+
+/* loading */
+#boot{position:fixed;inset:0;z-index:80;display:grid;place-items:center;background:var(--paper);color:var(--muted);font-size:16px}
+#boot.off{display:none}
+@media (max-width:560px){#sync span{display:none}#titleBtn{max-width:34vw}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* ---- v3: titulek, knihovna, editor, sešity ---- */
+#titleBtn{display:flex;align-items:center;gap:6px;line-height:1.2}
+#tBook{font-weight:500;color:var(--muted);font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:18vw}
+#tBook:empty{display:none}
+#tBook::after{content:" /";color:var(--line)}
+#tPage{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ib.tool{width:42px}
+.sw{width:31px}
+#drHead{display:flex;align-items:center;gap:4px;margin:0 0 10px;min-height:44px}
+#drHead h2{margin:0 4px;flex:1;font-size:22px;font-weight:700;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#drBack{height:40px;padding:0 10px 0 4px;border-radius:9px;color:var(--accent);font-weight:600;display:flex;align-items:center;gap:2px;white-space:nowrap}
+.pg .cnt{font-size:13px;color:var(--muted);padding-right:4px;white-space:nowrap}
+#dlgCh{display:flex;flex-direction:column;gap:6px;max-height:50vh;overflow-y:auto}
+#dlgCh button{height:46px;border-radius:9px;background:var(--chrome-2);text-align:left;padding:0 14px;font-size:16px}
+#dlgCh button[aria-current="true"]{background:var(--accent-soft);color:var(--accent);font-weight:600}
+
+#lib{position:fixed;z-index:25;right:12px;top:calc(env(safe-area-inset-top,0px) + 66px);bottom:calc(env(safe-area-inset-bottom,0px) + 80px);width:min(318px,calc(100vw - 24px));
+  flex-direction:column;align-items:stretch;padding:12px 10px 10px;display:none}
+#lib.on{display:flex}
+#libHead{display:flex;align-items:center;gap:6px;margin:0 2px 8px}
+#libHead h3{margin:0;flex:1;font-size:18px}
+#libHint{font-size:13px;color:var(--muted);margin:0 4px 8px;line-height:1.35}
+#libList{flex:1;overflow-y:auto;margin:0 -4px;padding:0 4px}
+#libList h4{margin:12px 2px 6px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.tile{position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 2px 6px;border-radius:10px;border:1px solid var(--line);background:var(--paper)}
+.tile canvas{width:84px;height:52px;display:block}
+.tile span{font-size:12px;line-height:1.2;text-align:center;padding:0 2px;min-height:2.4em;display:flex;align-items:center}
+.tile[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);box-shadow:0 0 0 1px var(--accent)}
+.tile .ed{position:absolute;top:2px;right:2px;width:28px;height:28px;border-radius:7px;display:grid;place-items:center;color:var(--muted);background:var(--chrome)}
+.tile .ed svg{width:15px;height:15px}
+#newSym{margin-top:10px;height:46px;border-radius:10px;border:1.5px dashed var(--line);display:flex;align-items:center;justify-content:center;gap:8px;font-weight:600;color:var(--muted);flex:none}
+
+#ins{position:fixed;z-index:30;right:12px;top:calc(env(safe-area-inset-top,0px) + 66px);width:min(320px,calc(100vw - 24px));padding:6px;flex-direction:column;align-items:stretch;display:none}
+#ins.on{display:flex}
+#ins .row{text-align:left;border-radius:9px;padding:6px 10px}
+#ins .row:active{background:var(--chrome-2)}
+.tb{height:40px;padding:0 12px;border-radius:9px;font-weight:600;font-size:15px;color:var(--accent);white-space:nowrap}
+.tb:active{background:var(--accent-soft)}
+#sed{position:fixed;inset:0;z-index:50;background:var(--paper);display:none;flex-direction:column;align-items:center;
+  padding:calc(env(safe-area-inset-top,0px) + 10px) 12px calc(env(safe-area-inset-bottom,0px) + 10px)}
+#sed.on{display:flex}
+#sedHead{width:min(760px,100%);display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px}
+#sedName{flex:1;min-width:150px;font:inherit;font-size:17px;height:42px;padding:0 12px;border-radius:9px;border:1px solid var(--line);background:var(--paper);color:var(--text);-webkit-user-select:text;user-select:text}
+#sedCat{font:inherit;font-size:15px;height:42px;padding:0 8px;border-radius:9px;border:1px solid var(--line);background:var(--paper);color:var(--text)}
+#sedTools{margin-top:8px;padding:4px;gap:2px;flex-wrap:wrap;justify-content:center;width:min(760px,100%)}
+#sedTools button.t{height:40px;padding:0 11px;border-radius:9px;font-size:15px;font-weight:500}
+#sedTools button.t[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent);font-weight:600}
+#sedHint{font-size:14px;color:var(--muted);margin:8px 0;text-align:center;min-height:1.3em;max-width:760px}
+#sedWrap{flex:1;display:grid;place-items:center;width:100%;min-height:0}
+#sedCv{touch-action:none;border-radius:12px;box-shadow:var(--shadow);border:1px solid var(--line);display:block}
+@media (max-width:760px){#tBook{display:none}}
+</style>
+</head>
+<body>
+<div id="stage"><canvas id="cv"></canvas></div>
+<textarea id="ta" spellcheck="false" autocapitalize="sentences"></textarea>
+
+<div id="top">
+  <div class="panel">
+    <button class="ib" id="menuBtn" aria-label="Sešity a stránky"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg></button>
+    <button id="titleBtn" aria-label="Otevřít seznam stránek"><span id="tBook"></span><span id="tPage">…</span></button>
+  </div>
+  <div class="panel" id="right">
+    <div id="sync" data-s="idle" aria-live="polite"><i></i><span>Připojuji…</span></div>
+    <div class="sep"></div>
+    <button class="ib" id="insBtn" aria-label="Vložit obrázek nebo PDF"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="1.8"/><path d="m21 15-4.5-4.5L7 20"/></svg></button>
+    <div class="sep"></div>
+    <button id="zoomBtn" aria-label="Zoom 100 %">100 %</button>
+    <button class="ib" id="fitBtn" aria-label="Zobrazit vše"><svg class="i" viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg></button>
+    <button class="ib" id="linkBtn" aria-label="Kopírovat odkaz na stránku"><svg class="i" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg></button>
+    <div id="peers"></div>
+  </div>
+</div>
+
+<div id="bottom">
+  <div class="panel" id="selbar">
+    <span class="lbl" id="selCount"></span>
+    <div id="selColors" style="display:flex"></div>
+    <div class="sep"></div>
+    <button class="ib" id="rotBtn" aria-label="Otočit o 90°"><svg class="i" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg></button>
+    <button class="ib" id="mirBtn" aria-label="Zrcadlit"><svg class="i" viewBox="0 0 24 24"><path d="M12 3v18"/><path d="M8 7 3 12l5 5V7z"/><path d="M16 7l5 5-5 5V7z"/></svg></button>
+    <button class="ib" id="dupBtn" aria-label="Duplikovat"><svg class="i" viewBox="0 0 24 24"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M4 16V5a2 2 0 0 1 2-2h11"/></svg></button>
+    <button class="tb" id="strBtn" aria-label="Srovnat tahy na čáry a tvary">Srovnat</button>
+    <button class="tb" id="schBtn" aria-label="Převést nakreslené schéma na značky">Na schéma</button>
+    <button class="ib" id="delBtn" aria-label="Smazat"><svg class="i" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg></button>
+  </div>
+  <div class="panel" id="tray">
+    <button class="ib tool" data-tool="pen" aria-label="Pero"><svg class="i" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
+    <button class="ib tool" data-tool="hl" aria-label="Zvýrazňovač"><svg class="i" viewBox="0 0 24 24"><path d="m9 11-6 6v3h9l3-3"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/></svg></button>
+    <button class="ib tool" data-tool="eraser" aria-label="Guma"><svg class="i" viewBox="0 0 24 24"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg></button>
+    <button class="ib tool" data-tool="lasso" aria-label="Výběr lasem"><svg class="i" viewBox="0 0 24 24"><path d="M7 22a5 5 0 0 1-2-4"/><path d="M3.3 14A6.8 6.8 0 0 1 2 10c0-4.4 4.5-8 10-8s10 3.6 10 8-4.5 8-10 8a12 12 0 0 1-5-1"/><circle cx="5" cy="16" r="2"/></svg></button>
+    <button class="ib tool" data-tool="text" aria-label="Text"><svg class="i" viewBox="0 0 24 24"><path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/></svg></button>
+    <button class="ib tool" data-tool="sym" aria-label="Schematické značky"><svg class="i" viewBox="0 0 24 24"><path d="M1.5 12h4M18.5 12h4"/><rect x="5.5" y="8.5" width="13" height="7" rx="1"/></svg></button>
+    <button class="ib tool" data-tool="wire" aria-label="Vodič"><svg class="i" viewBox="0 0 24 24"><circle cx="5" cy="19" r="2"/><circle cx="19" cy="5" r="2"/><path d="M7 19h5V5h5"/></svg></button>
+    <button class="ib tool" data-tool="hand" aria-label="Posun plochy"><svg class="i" viewBox="0 0 24 24"><path d="M18 11V6a2 2 0 0 0-4 0v5"/><path d="M14 10V4a2 2 0 0 0-4 0v6"/><path d="M10 10.5V6a2 2 0 0 0-4 0v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.9-6-2.4l-3.6-3.6a2 2 0 0 1 2.8-2.8L7 15"/></svg></button>
+    <div class="sep"></div>
+    <div id="colors" style="display:flex"></div>
+    <div class="sep" id="wsep"></div>
+    <div id="widths" style="display:flex"></div>
+    <div class="sep"></div>
+    <button class="ib" id="undoBtn" aria-label="Zpět" disabled><svg class="i" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></button>
+    <button class="ib" id="redoBtn" aria-label="Znovu" disabled><svg class="i" viewBox="0 0 24 24"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg></button>
+    <button class="ib" id="setBtn" aria-label="Nastavení"><svg class="i" viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg></button>
+  </div>
+</div>
+
+<div class="panel" id="pop" role="dialog" aria-label="Nastavení">
+  <div class="row"><div>Kreslit prstem<small>Jinak prst posouvá a zoomuje, kreslí jen Pencil.</small></div><button class="tg" id="tgFinger" role="switch" aria-checked="false" aria-label="Kreslit prstem"></button></div>
+  <div class="row"><div>Přichytávat tvary k tečkám<small>Rovné čáry a tvary (podržení pera) se zarovnají na tečky.</small></div><button class="tg" id="tgSnap" role="switch" aria-checked="true" aria-label="Přichytávat k tečkám"></button></div>
+  <div class="row"><div>Vzhled</div><div class="seg" id="themeSeg"><button data-t="auto">Auto</button><button data-t="light">Světlý</button><button data-t="dark">Tmavý</button></div></div>
+  <div id="acct"></div>
+</div>
+
+<div class="panel" id="ins" role="dialog" aria-label="Vložit">
+  <button class="row" data-ins="img"><div>Fotka nebo obrázek<small>Z Fotek nebo Souborů. Jde i převést na tahy.</small></div></button>
+  <button class="row" data-ins="cam"><div>Vyfotit<small>Tabule, sešit, zadání</small></div></button>
+  <button class="row" data-ins="pdf"><div>PDF<small>Např. export z Freeformu nebo zadání od učitele</small></div></button>
+  <button class="row" data-ins="clip"><div>Ze schránky<small>Obrázek zkopírovaný v jiné aplikaci</small></div></button>
+</div>
+<input type="file" id="fImg" accept="image/*" hidden>
+<input type="file" id="fCam" accept="image/*" capture="environment" hidden>
+<input type="file" id="fPdf" accept="application/pdf,.pdf" hidden>
+
+<div class="panel" id="lib" role="dialog" aria-label="Knihovna značek">
+  <div id="libHead"><h3>Knihovna značek</h3><button class="ib" id="libClose" aria-label="Zavřít knihovnu"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+  <p id="libHint">Vyber značku a klepni do plochy. Značku pak posuneš tažením, klepnutím ji vybereš (otočení, zrcadlení).</p>
+  <div id="libList"></div>
+  <button id="newSym"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Vlastní značka</button>
+</div>
+
+<div id="sed" role="dialog" aria-modal="true" aria-label="Editor značky">
+  <div class="panel" id="sedHead">
+    <input id="sedName" type="text" placeholder="Název značky" maxlength="40">
+    <select id="sedCat" aria-label="Kategorie"></select>
+    <button class="btn danger" id="sedDel">Smazat</button>
+    <button class="btn" id="sedCancel">Zrušit</button>
+    <button class="btn pri" id="sedSave">Uložit</button>
+  </div>
+  <div class="panel" id="sedTools">
+    <button class="t" data-et="pen">Pero</button>
+    <button class="t" data-et="line">Čára</button>
+    <button class="t" data-et="rect">Obdélník</button>
+    <button class="t" data-et="circle">Kruh</button>
+    <button class="t" data-et="pin">Vývod</button>
+    <button class="t" data-et="fill">Výplň</button>
+    <button class="t" data-et="eraser">Guma</button>
+    <div class="sep"></div>
+    <button class="t" id="sedUndo">Zpět</button>
+    <button class="t" id="sedClear">Vymazat</button>
+  </div>
+  <div id="sedHint"></div>
+  <div id="sedWrap"><canvas id="sedCv"></canvas></div>
+</div>
+
+<div id="scrim"></div>
+<nav id="drawer" aria-label="Sešity a stránky">
+  <div id="drHead"></div>
+  <div id="pageList"></div>
+  <button id="addPage"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span id="addLbl">Nová stránka</span></button>
+</nav>
+
+<div id="toast" role="status"></div>
+<div id="dlg"><div class="panel" id="dlgBox" role="dialog" aria-modal="true">
+  <h3 id="dlgT"></h3><p id="dlgP"></p><input id="dlgIn" type="text"><div id="dlgCh"></div>
+  <div class="btns"><button class="btn" id="dlgNo">Zrušit</button><button class="btn pri" id="dlgOk">OK</button></div>
+</div></div>
+<div id="boot">Načítám Tečkovník…</div>
+
+<script>
+(() => {
+'use strict';
+/* ================= konstanty ================= */
+const BASE_URL = window.TK_PWA ? '' : 'https://claude.ai/artifact/UbHCEHJ34vdrXqUUmmMzwa';
+const G = 20;                      // rozteč teček (světové jednotky)
+const CHUNK_LIMIT = window.TK_PWA ? 40000 : 170000;   // vlastní server: menší balíky = méně přenesených dat
+const LIVE_MAX = 90;
+const PEN_COLORS = ['k','#1E5BD8','#D7263D','#13824A','#E07A10','#7A3FD1'];
+const HL_COLORS = ['#FFD60A','#5BE584','#FF7AD1','#6EC4FF'];
+const PEN_W = [1.4, 2.6, 5];
+const HL_W = [10, 18, 28];
+const WIRE_W = 2;
+const CATS = ['Pasivní', 'Polovodiče', 'Spínací prvky', 'Zdroje', 'Měření a ostatní', 'Vlastní'];
+const SESSION = rid(6);
+
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const q = v => Math.round(v * 4) / 4;
+const sg = v => Math.round(v / G) * G;
+function rid(n = 10){ const a = 'abcdefghijkmnopqrstuvwxyz23456789'; let s = ''; for (const b of crypto.getRandomValues(new Uint8Array(n))) s += a[b % a.length]; return s; }
+const LS = {
+  get(k, d){ try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } }
+};
+
+/* ================= stav ================= */
+const st = {
+  pid: null, bid: null, pages: [], books: [], cam: { x: -60, y: -90, z: 1 },
+  tool: 'pen', penColor: 'k', hlColor: HL_COLORS[0], penW: 1, hlW: 1,
+  finger: LS.get('tk:finger', false), snap: LS.get('tk:snap', true), theme: LS.get('tk:theme', 'auto'),
+  readOnly: false, uid: null, hash: null, drawerView: 'pages', armed: null
+};
+const items = new Map();
+let geoCache = new WeakMap();
+const hidden = new Set();
+const chunks = new Map();
+let maxV = 0;
+let store = null, room = null, named = null, userCap = null;
+let unsubChunks = null, unsubPeers = null, roomToken = 0;
+const undoStack = [], redoStack = [];
+let selection = new Set(), selBB = null;
+let peers = [], peerNames = {}, liveBufs = new Map();
+
+function nv(){ maxV = Math.max(Date.now() * 1000, maxV + 1); return maxV; }
+
+/* ================= téma ================= */
+let T = {};
+function readTheme(){
+  const cs = getComputedStyle(document.documentElement);
+  const g = n => cs.getPropertyValue(n).trim();
+  T = { paper: g('--paper'), dot: g('--dot'), ink: g('--ink'), accent: g('--accent'), text: g('--text'), blend: g('--hl-blend') || 'multiply', dark: g('--hl-blend') === 'screen' };
+}
+function applyTheme(){
+  if (st.theme === 'auto') document.documentElement.removeAttribute('data-theme');
+  else document.documentElement.setAttribute('data-theme', st.theme);
+  readTheme(); staticDirty = true; requestDraw(); buildSwatches();
+  document.querySelectorAll('#themeSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.t === st.theme)));
+  if ($('#lib').classList.contains('on')) renderLib();
+  if (ED.open) drawEd();
+}
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (st.theme === 'auto') applyTheme(); });
+const colorOf = c => (c === 'k' || !/^#[0-9a-fA-F]{6}$/.test(c || '')) ? T.ink : c;
+
+/* ================= úložiště ================= */
+function dbStore(db){
+  return {
+    kind: 'db',
+    watch(name, cb, err){ return db.collection(name).onSnapshot(s => cb(s.docs.map(d => ({ id: d.id, ...d.data() }))), err); },
+    set(path, data){ return db.doc(path).set(data); },
+    update(path, patch){ return db.doc(path).update(patch); },
+    watchChunks(pid, cb, err){
+      return db.collection('pages/' + pid + '/chunks').onSnapshot(s => {
+        cb(s.docChanges().filter(c => c.type !== 'removed').map(c => c.doc.data()));
+      }, err);
+    },
+    saveChunk(pid, id, body){ return db.doc('pages/' + pid + '/chunks/' + id).set(body); },
+    async getChunks(pid){ const s = await db.collection('pages/' + pid + '/chunks').get(); return s.docs.map(d => d.data()); }
+  };
+}
+function localStore(){
+  const colls = {}, cbs = {};
+  const get = n => colls[n] || (colls[n] = LS.get('tk:col:' + n, {}));
+  const emit = n => { const m = get(n); (cbs[n] || []).forEach(cb => cb(Object.entries(m).map(([id, d]) => ({ id, ...d })))); };
+  const save = n => LS.set('tk:col:' + n, get(n)) ? Promise.resolve() : Promise.reject({ code: 'quota_exceeded' });
+  return {
+    kind: 'local',
+    watch(n, cb){ (cbs[n] = cbs[n] || []).push(cb); setTimeout(() => emit(n), 0); return () => {}; },
+    set(path, d){ const [n, id] = path.split('/'); get(n)[id] = d; const r = save(n); emit(n); return r; },
+    update(path, p){ const [n, id] = path.split('/'); get(n)[id] = Object.assign({}, get(n)[id], p); const r = save(n); emit(n); return r; },
+    watchChunks(pid, cb){ const all = LS.get('tk:c:' + pid, {}); setTimeout(() => cb(Object.values(all)), 0); return () => {}; },
+    getChunks(pid){ return Promise.resolve(Object.values(LS.get('tk:c:' + pid, {}))); },
+    saveChunk(pid, id, body){
+      const all = LS.get('tk:c:' + pid, {}); all[id] = body;
+      return LS.set('tk:c:' + pid, all) ? Promise.resolve() : Promise.reject({ code: 'quota_exceeded' });
+    }
+  };
+}
+
+/* ================= knihovna značek (ČSN EN 60617) ================= */
+const g = v => v * G;
+const bL = (x1, y1, x2, y2) => ({ p: [g(x1), g(y1), g(x2), g(y2)] });
+const bPL = (pts, cl, f) => ({ p: pts.flatMap(([x, y]) => [g(x), g(y)]), cl: cl ? 1 : 0, f: f ? 1 : 0 });
+const bR = (x0, y0, x1, y1, f) => bPL([[x0, y0], [x1, y0], [x1, y1], [x0, y1]], 1, f);
+function bC(cx, cy, r, f){ const p = []; for (let i = 0; i < 48; i++){ const t = i / 48 * Math.PI * 2; p.push([cx + Math.cos(t) * r, cy + Math.sin(t) * r]); } return bPL(p, 1, f); }
+const bAR = (x1, y1, x2, y2) => ({ p: [g(x1), g(y1), g(x2), g(y2)], ar: 1 });
+const bTX = (tx, x, y, fs) => ({ tx, x: g(x), y: g(y), fs: fs || 16 });
+function bCoil(x0, y, humps, r){ const p = []; for (let k = 0; k < humps; k++){ const cx = x0 + r + k * 2 * r; for (let i = 0; i <= 10; i++){ const t = i / 10 * Math.PI; p.push([cx - r * Math.cos(t), y - r * Math.sin(t)]); } } return bPL(p, 0); }
+function bSine(x0, x1, y, a){ const p = []; for (let i = 0; i <= 24; i++){ const t = i / 24; p.push([x0 + (x1 - x0) * t, y - a * Math.sin(t * Math.PI * 2)]); } return bPL(p, 0); }
+const DIODE = [bL(0, 1, 2, 1), bPL([[2, 0.4], [2, 1.6], [3, 1]], 1, 0), bL(3, 1, 5, 1)];
+const NO_CONTACT = [bL(0, 1, 1.5, 1), bL(1.5, 1, 3.45, 0.25), bL(3.5, 1, 5, 1)];
+const TR_BASE = [bC(1.6, 2, 1.25), bL(0, 2, 1.2, 2), bL(1.2, 1.25, 1.2, 2.75), bPL([[1.2, 1.7], [2, 1.15], [2, 0]], 0), bPL([[1.2, 2.3], [2, 2.85], [2, 4]], 0)];
+const P2 = [[0, 1], [5, 1]];
+const BUILTIN_RAW = [
+  { id: 'b:res', name: 'Rezistor', cat: 'Pasivní', prims: [bL(0, 1, 1, 1), bR(1, 0.65, 4, 1.35), bL(4, 1, 5, 1)], pins: P2 },
+  { id: 'b:pot', name: 'Proměnný rezistor', cat: 'Pasivní', prims: [bL(0, 1, 1, 1), bR(1, 0.65, 4, 1.35), bL(4, 1, 5, 1), bAR(1.3, 2, 3.9, -0.05)], pins: P2 },
+  { id: 'b:cap', name: 'Kondenzátor', cat: 'Pasivní', prims: [bL(0, 1, 2.3, 1), bL(2.3, 0.2, 2.3, 1.8), bL(2.7, 0.2, 2.7, 1.8), bL(2.7, 1, 5, 1)], pins: P2 },
+  { id: 'b:ecap', name: 'Elektrolytický kondenzátor', cat: 'Pasivní', prims: [bL(0, 1, 2.3, 1), bL(2.3, 0.2, 2.3, 1.8), bR(2.6, 0.2, 2.85, 1.8, 1), bL(2.85, 1, 5, 1), bTX('+', 1.85, 0.35, 14)], pins: P2 },
+  { id: 'b:ind', name: 'Cívka', cat: 'Pasivní', prims: [bL(0, 1, 1, 1), bCoil(1, 1, 4, 0.375), bL(4, 1, 5, 1)], pins: P2 },
+  { id: 'b:fuse', name: 'Pojistka', cat: 'Pasivní', prims: [bL(0, 1, 5, 1), bR(1, 0.65, 4, 1.35)], pins: P2 },
+  { id: 'b:diode', name: 'Dioda', cat: 'Polovodiče', prims: [...DIODE, bL(3, 0.4, 3, 1.6)], pins: P2 },
+  { id: 'b:led', name: 'LED', cat: 'Polovodiče', prims: [...DIODE, bL(3, 0.4, 3, 1.6), bAR(2.5, 0.25, 3.2, -0.45), bAR(2.95, 0.45, 3.65, -0.25)], pins: P2 },
+  { id: 'b:zener', name: 'Zenerova dioda', cat: 'Polovodiče', prims: [...DIODE, bPL([[2.75, 1.75], [3, 1.6], [3, 0.4], [3.25, 0.25]], 0)], pins: P2 },
+  { id: 'b:npn', name: 'Tranzistor NPN', cat: 'Polovodiče', prims: [...TR_BASE, bAR(1.3, 2.37, 1.88, 2.77)], pins: [[0, 2], [2, 0], [2, 4]] },
+  { id: 'b:pnp', name: 'Tranzistor PNP', cat: 'Polovodiče', prims: [...TR_BASE, bAR(1.95, 2.82, 1.3, 2.37)], pins: [[0, 2], [2, 0], [2, 4]] },
+  { id: 'b:opamp', name: 'Operační zesilovač', cat: 'Polovodiče', prims: [bPL([[1, 0], [1, 4], [4, 2]], 1), bL(0, 1, 1, 1), bL(0, 3, 1, 3), bL(4, 2, 5, 2), bTX('−', 1.45, 1, 18), bTX('+', 1.45, 3, 18)], pins: [[0, 1], [0, 3], [5, 2]] },
+  { id: 'b:sw', name: 'Spínač (spínací)', cat: 'Spínací prvky', prims: NO_CONTACT, pins: P2 },
+  { id: 'b:swnc', name: 'Spínač (rozpínací)', cat: 'Spínací prvky', prims: [bL(0, 1, 1.5, 1), bL(3.5, 1, 5, 1), bL(3.5, 1, 3.5, 0.35), bL(1.5, 1, 3.75, 0.4)], pins: P2 },
+  { id: 'b:btn', name: 'Tlačítko', cat: 'Spínací prvky', prims: [...NO_CONTACT, bL(2.45, 0.62, 2.45, -0.35), bL(2, -0.35, 2.9, -0.35)], pins: P2 },
+  { id: 'b:relay', name: 'Cívka relé', cat: 'Spínací prvky', prims: [bL(0, 1, 1.5, 1), bR(1.5, 0.3, 3.5, 1.7), bL(3.5, 1, 5, 1)], pins: P2 },
+  { id: 'b:bat', name: 'Článek / baterie', cat: 'Zdroje', prims: [bL(0, 1, 2.3, 1), bL(2.3, 0.1, 2.3, 1.9), bR(2.6, 0.55, 2.8, 1.45, 1), bL(2.8, 1, 5, 1), bTX('+', 1.85, 0.25, 14)], pins: P2 },
+  { id: 'b:vsrc', name: 'Zdroj napětí', cat: 'Zdroje', prims: [bL(0, 1, 1.5, 1), bC(2.5, 1, 1), bL(1.5, 1, 3.5, 1), bL(3.5, 1, 5, 1)], pins: P2 },
+  { id: 'b:isrc', name: 'Zdroj proudu', cat: 'Zdroje', prims: [bL(0, 1, 1.5, 1), bC(2.5, 1, 1), bL(2.5, 0, 2.5, 2), bL(3.5, 1, 5, 1)], pins: P2 },
+  { id: 'b:ac', name: 'Střídavý zdroj', cat: 'Zdroje', prims: [bL(0, 1, 1.5, 1), bC(2.5, 1, 1), bSine(1.95, 3.05, 1, 0.3), bL(3.5, 1, 5, 1)], pins: P2 },
+  { id: 'b:gnd', name: 'Uzemnění', cat: 'Zdroje', prims: [bL(1, 0, 1, 1), bL(0, 1, 2, 1), bL(0.35, 1.35, 1.65, 1.35), bL(0.7, 1.7, 1.3, 1.7)], pins: [[1, 0]] },
+  { id: 'b:lamp', name: 'Žárovka', cat: 'Měření a ostatní', prims: [bL(0, 1, 1.7, 1), bC(2.5, 1, 0.8), bL(1.93, 0.43, 3.07, 1.57), bL(1.93, 1.57, 3.07, 0.43), bL(3.3, 1, 5, 1)], pins: P2 },
+  { id: 'b:motor', name: 'Motor', cat: 'Měření a ostatní', prims: [bL(0, 1, 1.5, 1), bC(2.5, 1, 1), bTX('M', 2.5, 1, 20), bL(3.5, 1, 5, 1)], pins: P2 },
+  { id: 'b:volt', name: 'Voltmetr', cat: 'Měření a ostatní', prims: [bL(0, 1, 1.5, 1), bC(2.5, 1, 1), bTX('V', 2.5, 1, 20), bL(3.5, 1, 5, 1)], pins: P2 },
+  { id: 'b:amp', name: 'Ampérmetr', cat: 'Měření a ostatní', prims: [bL(0, 1, 1.5, 1), bC(2.5, 1, 1), bTX('A', 2.5, 1, 20), bL(3.5, 1, 5, 1)], pins: P2 },
+  { id: 'b:term', name: 'Svorka', cat: 'Měření a ostatní', prims: [bL(0, 1, 1, 1), bC(1.3, 1, 0.3)], pins: [[0, 1]] }
+];
+function primBB(pr){
+  if (pr.tx != null) return [pr.x - pr.fs * 0.45, pr.y - pr.fs * 0.6, pr.x + pr.fs * 0.45, pr.y + pr.fs * 0.6];
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (let i = 0; i < pr.p.length; i += 2){ x0 = Math.min(x0, pr.p[i]); x1 = Math.max(x1, pr.p[i]); y0 = Math.min(y0, pr.p[i+1]); y1 = Math.max(y1, pr.p[i+1]); }
+  if (pr.ar){ x0 -= 8; y0 -= 8; x1 += 8; y1 += 8; }
+  return [x0, y0, x1, y1];
+}
+function normalizeDef(prims, pins){
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const pr of prims){ const b = primBB(pr); x0 = Math.min(x0, b[0]); y0 = Math.min(y0, b[1]); x1 = Math.max(x1, b[2]); y1 = Math.max(y1, b[3]); }
+  for (const [x, y] of pins){ x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
+  if (!isFinite(x0)){ x0 = y0 = 0; x1 = y1 = G; }
+  const ox = Math.floor(x0 / G) * G, oy = Math.floor(y0 / G) * G;
+  const shift = pr => pr.tx != null ? { ...pr, x: q(pr.x - ox), y: q(pr.y - oy) } : { ...pr, p: pr.p.map((v, i) => q(v - (i % 2 ? oy : ox))) };
+  return {
+    prims: prims.map(shift), pins: pins.map(([x, y]) => [x - ox, y - oy]),
+    w: Math.max(G, Math.ceil((x1 - ox) / G - 1e-6) * G), h: Math.max(G, Math.ceil((y1 - oy) / G - 1e-6) * G)
+  };
+}
+const BUILTIN = BUILTIN_RAW.map(d => ({ ...d, builtin: true, ...normalizeDef(d.prims, d.pins.map(([x, y]) => [g(x), g(y)])) }));
+const BUILTIN_MAP = new Map(BUILTIN.map(d => [d.id, d]));
+const symMap = new Map();   // 'c:<docId>' -> def (vlastní, sdílené)
+function sanitizeSym(id, d){
+  if (!d || typeof d.name !== 'string' || !Array.isArray(d.prims) || !Array.isArray(d.pins) || d.prims.length > 400 || d.pins.length > 24) return null;
+  const prims = [];
+  for (const pr of d.prims){
+    if (!pr || typeof pr !== 'object') continue;
+    if (pr.tx != null){ if (typeof pr.tx === 'string' && pr.tx.length <= 20 && isFinite(pr.x) && isFinite(pr.y) && isFinite(pr.fs)) prims.push({ tx: pr.tx, x: +pr.x, y: +pr.y, fs: clamp(+pr.fs, 4, 80) }); continue; }
+    if (!Array.isArray(pr.p) || pr.p.length < 2 || pr.p.length > 4000 || pr.p.length % 2 || !pr.p.every(Number.isFinite)) continue;
+    prims.push({ p: pr.p, cl: pr.cl ? 1 : 0, f: pr.f ? 1 : 0, ar: pr.ar ? 1 : 0, sm: pr.sm ? 1 : 0 });
+  }
+  const pins = d.pins.filter(p => Array.isArray(p) && p.length === 2 && p.every(Number.isFinite));
+  if (!isFinite(d.w) || !isFinite(d.h)) return null;
+  return { id: 'c:' + id, docId: id, name: d.name.slice(0, 40), cat: CATS.includes(d.cat) ? d.cat : 'Vlastní', prims, pins, w: clamp(+d.w, G, 2000), h: clamp(+d.h, G, 2000), deleted: !!d.deleted, createdAt: d.createdAt || 0 };
+}
+let rawSymbols = [];
+function onSymbols(list){
+  rawSymbols = list;
+  symMap.clear();
+  for (const d of list){ const s = sanitizeSym(d.id, d); if (s) symMap.set(s.id, s); }
+  geoCache = new WeakMap(); staticDirty = true; requestDraw();
+  if ($('#lib').classList.contains('on')) renderLib();
+}
+const getDef = sid => BUILTIN_MAP.get(sid) || symMap.get(sid) || null;
+
+/* ================= validace sdílených dat ================= */
+const okAtt = a => a == null || (typeof a === 'object' && typeof a.s === 'string' && Number.isInteger(a.i) && a.i >= 0 && a.i < 64);
+function valid(e){
+  if (!e || typeof e.id !== 'string' || e.id.length > 40 || typeof e.v !== 'number') return false;
+  if (e.k === 'd') return true;
+  if (e.k === 's') return Array.isArray(e.p) && e.p.length >= 3 && e.p.length % 3 === 0 && e.p.length <= 90000 && typeof e.w === 'number' && e.w > 0 && e.w < 200 && okAtt(e.a) && okAtt(e.b);
+  if (e.k === 't') return typeof e.txt === 'string' && e.txt.length <= 5000 && isFinite(e.x) && isFinite(e.y) && isFinite(e.fs);
+  if (e.k === 'y') return typeof e.sid === 'string' && e.sid.length < 60 && isFinite(e.x) && isFinite(e.y) && [0, 1, 2, 3].includes(e.r || 0);
+  if (e.k === 'i') return typeof e.ref === 'string' && /^[A-Za-z0-9_:\/.-]{1,200}$/.test(e.ref) && isFinite(e.x) && isFinite(e.y) && e.w > 0 && e.h > 0 && e.w < 50000 && e.h < 50000;
+  return false;
+}
+function ingest(list){
+  let ch = false;
+  for (const e of list){
+    if (!valid(e)) continue;
+    if (e.v > maxV) maxV = e.v;
+    const cur = items.get(e.id);
+    if (!cur || e.v > cur.v){ items.set(e.id, e); ch = true; }
+  }
+  if (ch){
+    for (const id of selection){ const it = items.get(id); if (!it || it.k === 'd') selection.delete(id); }
+    updateSelBB();
+    for (const [peer, b] of liveBufs) if (items.has(b.id)) liveBufs.delete(peer);
+    staticDirty = true; requestDraw();
+  }
+}
+
+/* ================= ukládání (vlastní balíky) ================= */
+function ownChunk(){
+  let c = chunks.get(st.pid);
+  if (!c){ c = mkChunk(st.pid, 0); chunks.set(st.pid, c); }
+  return c;
+}
+function mkChunk(pid, n){
+  const u = (st.uid || 'anon').replace(/[^A-Za-z0-9_-]/g, '').slice(-10) || 'anon';
+  return { pid, n, id: u + '-' + SESSION + '-' + n, items: [], size: 100, dirty: false, saving: false, timer: null, tries: 0 };
+}
+function commit(entries){
+  if (st.readOnly || !st.pid || !entries.length) return;
+  const c = ownChunk();
+  for (const e of entries){ c.items.push(e); c.size += JSON.stringify(e).length + 1; }
+  ingest(entries);
+  c.dirty = true; scheduleSave(c, 250);
+}
+function scheduleSave(c, ms){ clearTimeout(c.timer); c.timer = setTimeout(() => flush(c), ms); setSync('saving'); }
+async function flush(c){
+  if (c.saving || !c.dirty) return;
+  c.saving = true; c.dirty = false;
+  let ok = true;
+  try { await store.saveChunk(c.pid, c.id, { u: st.uid || '', n: c.n, items: c.items.slice() }); c.tries = 0; }
+  catch (err){ ok = false; c.dirty = true; onWriteError(err, c); }
+  c.saving = false;
+  if (!ok) return;
+  if (c.dirty){ scheduleSave(c, 150); return; }
+  if (c.size > CHUNK_LIMIT && chunks.get(c.pid) === c) chunks.set(c.pid, mkChunk(c.pid, c.n + 1));
+  refreshSync();
+}
+function onWriteError(err, c){
+  const code = err && err.code;
+  if (code === 'invalid_argument' || code === 'revoked' || code === 'not_granted'){
+    setReadOnly(true); toast('Tuhle stránku nemůžeš upravovat – máš jen právo ke čtení.'); return;
+  }
+  if (code === 'quota_exceeded'){ setSync('error', 'Úložiště je plné'); toast('Úložiště je plné. Smaž nepotřebné stránky.'); return; }
+  c.tries++;
+  setSync('error', 'Offline – zkouším znovu');
+  scheduleSave(c, Math.min(30000, 1200 * Math.pow(1.7, c.tries)) * (0.7 + Math.random() * 0.6));
+}
+function refreshSync(){
+  if (st.readOnly) return setSync('ro');
+  for (const c of chunks.values()) if (c.dirty || c.saving) return setSync('saving');
+  setSync('saved');
+}
+function setSync(s, txt){
+  const el = $('#sync');
+  if (s === 'saving' && el.dataset.s === 'error') return;
+  el.dataset.s = s;
+  const map = { saved: store && store.kind === 'local' ? 'Jen v tomto zařízení' : 'Uloženo', saving: 'Ukládám…', ro: 'Jen ke čtení', idle: 'Připojuji…' };
+  el.querySelector('span').textContent = txt || map[s] || '';
+}
+window.addEventListener('beforeunload', e => { for (const c of chunks.values()) if (c.dirty || c.saving){ e.preventDefault(); e.returnValue = ''; return; } });
+window.addEventListener('online', () => { for (const c of chunks.values()) if (c.dirty) scheduleSave(c, 50); });
+
+/* ================= undo / redo ================= */
+function commitOp(after){
+  if (!after.length) return;
+  const pairs = after.map(a => ({ before: items.get(a.id) || null, after: a }));
+  commit(after);
+  undoStack.push(pairs); if (undoStack.length > 200) undoStack.shift();
+  redoStack.length = 0; updUndo();
+}
+function undo(){
+  const pairs = undoStack.pop(); if (!pairs) return;
+  commit(pairs.map(({ before, after }) => before ? { ...before, v: nv() } : { id: after.id, k: 'd', v: nv() }));
+  redoStack.push(pairs); clearSelection(); updUndo();
+}
+function redo(){
+  const pairs = redoStack.pop(); if (!pairs) return;
+  commit(pairs.map(({ after }) => ({ ...after, v: nv() })));
+  undoStack.push(pairs); clearSelection(); updUndo();
+}
+function updUndo(){ $('#undoBtn').disabled = !undoStack.length || st.readOnly; $('#redoBtn').disabled = !redoStack.length || st.readOnly; }
+
+/* ================= geometrie ================= */
+const isShape = e => !!(e.line || e.poly || e.ar);
+function radius(w, p){ return w / 2 * (0.45 + 1.1 * clamp(p, 0, 1)); }
+function buildGeom(e){
+  const p = e.p, n = p.length / 3;
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (let i = 0; i < n; i++){ const x = p[i*3], y = p[i*3+1]; if (x < minX) minX = x; if (y < minY) minY = y; if (x > maxX) maxX = x; if (y > maxY) maxY = y; }
+  const pad = (e.t === 'hl' ? e.w / 2 : e.w) + 2 + (e.ar ? Math.max(14, e.w * 5) : 0);
+  const bb = { x0: minX - pad, y0: minY - pad, x1: maxX + pad, y1: maxY + pad };
+  const path = new Path2D();
+  if (isShape(e)){
+    path.moveTo(p[0], p[1]);
+    for (let i = 1; i < n; i++) path.lineTo(p[i*3], p[i*3+1]);
+    if (n === 1) path.lineTo(p[0] + 0.01, p[1]);
+    if (e.cl) path.closePath();
+    if (e.ar && n >= 2){
+      const bx = p[(n-1)*3], by = p[(n-1)*3+1], ax = p[(n-2)*3], ay = p[(n-2)*3+1];
+      const ang = Math.atan2(by - ay, bx - ax), L = Math.max(12, e.w * 4.5);
+      path.moveTo(bx - L * Math.cos(ang - 0.48), by - L * Math.sin(ang - 0.48)); path.lineTo(bx, by);
+      path.lineTo(bx - L * Math.cos(ang + 0.48), by - L * Math.sin(ang + 0.48));
+    }
+    return { path, caps: null, bb };
+  }
+  if (e.t === 'hl'){
+    path.moveTo(p[0], p[1]);
+    if (n === 1) path.lineTo(p[0] + 0.01, p[1]);
+    else if (n === 2) path.lineTo(p[3], p[4]);
+    else {
+      for (let i = 1; i < n - 1; i++){ const mx = (p[i*3] + p[(i+1)*3]) / 2, my = (p[i*3+1] + p[(i+1)*3+1]) / 2; path.quadraticCurveTo(p[i*3], p[i*3+1], mx, my); }
+      path.lineTo(p[(n-1)*3], p[(n-1)*3+1]);
+    }
+    return { path, caps: null, bb };
+  }
+  const R = new Array(n);
+  for (let i = 0; i < n; i++) R[i] = radius(e.w, p[i*3+2] / 100);
+  for (let k = 0; k < 2; k++) for (let i = 1; i < n - 1; i++) R[i] = (R[i-1] + 2 * R[i] + R[i+1]) / 4;
+  const caps = new Path2D();
+  caps.arc(p[0], p[1], R[0], 0, Math.PI * 2);
+  if (n === 1) return { path: caps, caps: null, bb };
+  caps.moveTo(p[(n-1)*3] + R[n-1], p[(n-1)*3+1]); caps.arc(p[(n-1)*3], p[(n-1)*3+1], R[n-1], 0, Math.PI * 2);
+  const L = [], Rt = [];
+  for (let i = 0; i < n; i++){
+    const a = Math.max(0, i - 1), b = Math.min(n - 1, i + 1);
+    let dx = p[b*3] - p[a*3], dy = p[b*3+1] - p[a*3+1]; const d = Math.hypot(dx, dy) || 1; dx /= d; dy /= d;
+    const x = p[i*3], y = p[i*3+1], r = R[i];
+    L.push(x - dy * r, y + dx * r); Rt.push(x + dy * r, y - dx * r);
+  }
+  const side = (A, rev) => {
+    const m = A.length / 2, idx = j => rev ? m - 1 - j : j;
+    if (!rev) path.moveTo(A[0], A[1]); else path.lineTo(A[idx(0)*2], A[idx(0)*2+1]);
+    for (let j = 1; j < m - 1; j++){ const i0 = idx(j), i1 = idx(j + 1); path.quadraticCurveTo(A[i0*2], A[i0*2+1], (A[i0*2] + A[i1*2]) / 2, (A[i0*2+1] + A[i1*2+1]) / 2); }
+    path.lineTo(A[idx(m-1)*2], A[idx(m-1)*2+1]);
+  };
+  side(L, false); side(Rt, true); path.closePath();
+  return { path, caps, bb };
+}
+const FONT = fs => `500 ${fs}px Barlow, system-ui, sans-serif`;
+let measureCtx = null;
+function textGeom(e){
+  measureCtx = measureCtx || document.createElement('canvas').getContext('2d');
+  measureCtx.font = FONT(e.fs);
+  const lines = e.txt.split('\n'); let w = 0;
+  for (const l of lines) w = Math.max(w, measureCtx.measureText(l).width);
+  return { lines, bb: { x0: e.x - 2, y0: e.y - 2, x1: e.x + w + 2, y1: e.y + lines.length * e.fs * 1.3 + 2 } };
+}
+/* značky: transformace místní souřadnice -> plocha (zrcadlení, otočení po 90° kolem středu na tečce) */
+const symCenter = def => [Math.round(def.w / 2 / G) * G, Math.round(def.h / 2 / G) * G];
+function symTf(e, def, lx, ly){
+  const [cx, cy] = symCenter(def);
+  let dx = lx - cx, dy = ly - cy;
+  if (e.m) dx = -dx;
+  for (let i = 0; i < (e.r || 0); i++){ const t = dx; dx = -dy; dy = t; }
+  return [e.x + cx + dx, e.y + cy + dy];
+}
+function symGeom(e){
+  const def = getDef(e.sid);
+  if (!def) return { bb: { x0: e.x, y0: e.y, x1: e.x + 2 * G, y1: e.y + 2 * G }, pins: [], def: null };
+  const c = [[0, 0], [def.w, 0], [0, def.h], [def.w, def.h]].map(([x, y]) => symTf(e, def, x, y));
+  const xs = c.map(v => v[0]), ys = c.map(v => v[1]);
+  return { bb: { x0: Math.min(...xs) - 4, y0: Math.min(...ys) - 4, x1: Math.max(...xs) + 4, y1: Math.max(...ys) + 4 }, pins: def.pins.map(([x, y]) => symTf(e, def, x, y)), def };
+}
+function geom(e){
+  let gm = geoCache.get(e);
+  if (!gm){ gm = e.k === 't' ? textGeom(e) : e.k === 'y' ? symGeom(e) : e.k === 'i' ? { bb: { x0: e.x, y0: e.y, x1: e.x + e.w, y1: e.y + e.h } } : buildGeom(e); geoCache.set(e, gm); }
+  return gm;
+}
+const inter = (a, b) => a.x0 <= b.x1 && a.x1 >= b.x0 && a.y0 <= b.y1 && a.y1 >= b.y0;
+
+/* ================= kreslení ================= */
+const cv = $('#cv'), ctx = cv.getContext('2d');
+const sl = document.createElement('canvas'), sctx = sl.getContext('2d');
+let W = 0, H = 0, DPR = 1, staticDirty = true, drawQueued = false;
+function resize(){
+  DPR = Math.min(window.devicePixelRatio || 1, 2.5); W = window.innerWidth; H = window.innerHeight;
+  for (const c of [cv, sl]){ c.width = Math.round(W * DPR); c.height = Math.round(H * DPR); }
+  staticDirty = true; requestDraw();
+  if (ED.open){ sizeEditor(); drawEd(); }
+}
+function requestDraw(){ if (!drawQueued){ drawQueued = true; requestAnimationFrame(draw); } }
+function viewBB(){ const c = st.cam; return { x0: c.x, y0: c.y, x1: c.x + W / c.z, y1: c.y + H / c.z }; }
+function worldTf(c2){ const c = st.cam; c2.setTransform(DPR * c.z, 0, 0, DPR * c.z, -c.x * c.z * DPR, -c.y * c.z * DPR); }
+
+function drawDots(c2){
+  const { x, y, z } = st.cam;
+  let step = G; while (step * z < 10) step *= 5;
+  const r = clamp(1.05 * Math.sqrt(z), 0.8, 1.7) * DPR;
+  const sx0 = Math.floor(x / step) * step, sy0 = Math.floor(y / step) * step;
+  c2.setTransform(1, 0, 0, 1, 0, 0); c2.fillStyle = T.dot; c2.beginPath();
+  for (let wx = sx0; wx <= x + W / z + step; wx += step){
+    const px = (wx - x) * z * DPR;
+    for (let wy = sy0; wy <= y + H / z + step; wy += step){ const py = (wy - y) * z * DPR; c2.rect(px - r, py - r, r * 2, r * 2); }
+  }
+  c2.fill();
+}
+/* kreslení primitiv značky (sdílí plocha, knihovna i editor) */
+function primPath(pr){
+  const p = pr.p, n = p.length / 2, path = new Path2D();
+  path.moveTo(p[0], p[1]);
+  if (n === 1) path.lineTo(p[0] + 0.01, p[1]);
+  else if (pr.sm && n > 2){
+    for (let i = 1; i < n - 1; i++) path.quadraticCurveTo(p[i*2], p[i*2+1], (p[i*2] + p[(i+1)*2]) / 2, (p[i*2+1] + p[(i+1)*2+1]) / 2);
+    path.lineTo(p[(n-1)*2], p[(n-1)*2+1]);
+  } else for (let i = 1; i < n; i++) path.lineTo(p[i*2], p[i*2+1]);
+  if (pr.cl) path.closePath();
+  if (pr.ar && n >= 2){
+    const bx = p[(n-1)*2], by = p[(n-1)*2+1], ax = p[(n-2)*2], ay = p[(n-2)*2+1], ang = Math.atan2(by - ay, bx - ax), L = 7;
+    path.moveTo(bx - L * Math.cos(ang - 0.45), by - L * Math.sin(ang - 0.45)); path.lineTo(bx, by); path.lineTo(bx - L * Math.cos(ang + 0.45), by - L * Math.sin(ang + 0.45));
+  }
+  return path;
+}
+function drawPrims(c2, prims, color, withText, lw){
+  c2.strokeStyle = color; c2.fillStyle = color; c2.lineWidth = lw || WIRE_W; c2.lineCap = 'round'; c2.lineJoin = 'round';
+  for (const pr of prims){
+    if (pr.tx != null){ if (withText){ c2.font = `600 ${pr.fs}px Barlow, system-ui, sans-serif`; c2.textAlign = 'center'; c2.textBaseline = 'middle'; c2.fillText(pr.tx, pr.x, pr.y); c2.textAlign = 'start'; } continue; }
+    const path = primPath(pr);
+    if (pr.f && pr.cl) c2.fill(path);
+    c2.stroke(path);
+  }
+}
+function drawSymbol(c2, e, alpha){
+  const gm = geom(e), def = gm.def, col = colorOf(e.c);
+  if (!def){
+    c2.save(); c2.setLineDash([4, 4]); c2.strokeStyle = col; c2.lineWidth = 1.5; c2.strokeRect(e.x, e.y, 2 * G, 2 * G); c2.restore(); return;
+  }
+  const [cx, cy] = symCenter(def);
+  c2.save(); if (alpha) c2.globalAlpha = alpha;
+  c2.translate(e.x + cx, e.y + cy); c2.rotate((e.r || 0) * Math.PI / 2); if (e.m) c2.scale(-1, 1); c2.translate(-cx, -cy);
+  drawPrims(c2, def.prims, col, false);
+  c2.restore();
+  c2.save(); if (alpha) c2.globalAlpha = alpha; c2.fillStyle = col; c2.textAlign = 'center'; c2.textBaseline = 'middle';
+  for (const pr of def.prims){ if (pr.tx == null) continue; const [tx, ty] = symTf(e, def, pr.x, pr.y); c2.font = `600 ${pr.fs}px Barlow, system-ui, sans-serif`; c2.fillText(pr.tx, tx, ty); }
+  c2.restore();
+}
+function drawItem(c2, e, alpha){
+  if (e.k === 'y'){ drawSymbol(c2, e, alpha); return; }
+  if (e.k === 'i'){ drawImageItem(c2, e, alpha); return; }
+  if (e.k === 't'){
+    const gm = geom(e); c2.fillStyle = colorOf(e.c); c2.font = FONT(e.fs); c2.textBaseline = 'top';
+    gm.lines.forEach((l, i) => c2.fillText(l, e.x, e.y + i * e.fs * 1.3));
+    return;
+  }
+  const gm = geom(e);
+  if (e.t === 'hl'){
+    c2.save(); c2.globalAlpha = (T.dark ? 0.42 : 0.5) * (alpha || 1); c2.globalCompositeOperation = T.blend;
+    c2.strokeStyle = colorOf(e.c); c2.lineWidth = e.w; c2.lineCap = 'round'; c2.lineJoin = 'round';
+    c2.stroke(gm.path); c2.restore(); return;
+  }
+  if (isShape(e)){ c2.strokeStyle = colorOf(e.c); c2.lineWidth = e.w; c2.lineCap = 'round'; c2.lineJoin = 'round'; c2.stroke(gm.path); return; }
+  c2.fillStyle = colorOf(e.c); c2.fill(gm.path); if (gm.caps) c2.fill(gm.caps);
+}
+/* uzlové tečky: konec vodiče uvnitř jiného vodiče nebo 3+ konce v jednom bodě */
+function drawJunctions(c2, wires){
+  if (wires.length < 2) return;
+  const ends = new Map(), segs = [];
+  for (const w of wires){
+    const p = w.p, n = p.length / 3;
+    for (const k of [0, n - 1]){ const key = p[k*3] + ',' + p[k*3+1]; const o = ends.get(key) || { x: p[k*3], y: p[k*3+1], n: 0, c: w.c }; o.n++; ends.set(key, o); }
+    for (let i = 0; i < n - 1; i++) segs.push([p[i*3], p[i*3+1], p[i*3+3], p[i*3+4]]);
+  }
+  for (const o of ends.values()){
+    let cnt = o.n;
+    for (const [ax, ay, bx, by] of segs){
+      if ((o.x === ax && o.y === ay) || (o.x === bx && o.y === by)) continue;
+      if (segDist(o.x, o.y, ax, ay, bx, by) < 0.6) cnt += 2;
+      if (cnt >= 3) break;
+    }
+    if (cnt >= 3){ c2.fillStyle = colorOf(o.c); c2.beginPath(); c2.arc(o.x, o.y, 3.6, 0, Math.PI * 2); c2.fill(); }
+  }
+}
+function drawStatic(){
+  sctx.setTransform(1, 0, 0, 1, 0, 0);
+  sctx.fillStyle = T.paper; sctx.fillRect(0, 0, sl.width, sl.height);
+  drawDots(sctx);
+  worldTf(sctx);
+  const vb = viewBB(), wires = [];
+  for (const pass of [0, 1, 2]){          // 0 obrázky, 1 zvýrazňovač, 2 vše ostatní
+    for (const e of items.values()){
+      if (e.k === 'd' || hidden.has(e.id)) continue;
+      if ((pass === 0) !== (e.k === 'i')) continue;
+      if (pass > 0 && (e.t === 'hl') !== (pass === 1)) continue;
+      if (!inter(geom(e).bb, vb)) continue;
+      drawItem(sctx, e);
+      if (e.wi) wires.push(e);
+    }
+  }
+  drawJunctions(sctx, wires);
+}
+function visibleSymPins(){
+  const vb = viewBB(), out = [];
+  for (const e of items.values()){
+    if (e.k !== 'y' || hidden.has(e.id)) continue;
+    const gm = geom(e); if (!inter(gm.bb, vb)) continue;
+    gm.pins.forEach((p, i) => out.push({ x: p[0], y: p[1], s: e.id, i }));
+  }
+  return out;
+}
+function draw(){
+  drawQueued = false;
+  if (staticDirty){ drawStatic(); staticDirty = false; }
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.drawImage(sl, 0, 0);
+  worldTf(ctx);
+  const z = st.cam.z;
+  if (act && act.type === 'move'){
+    ctx.save(); ctx.translate(act.dx, act.dy);
+    for (const id of selection){ const e = items.get(id); if (e && e.k !== 'd') drawItem(ctx, e); }
+    ctx.restore();
+    for (const w of act.follow || []) drawItem(ctx, w);
+  }
+  if (act && act.type === 'draw') drawItem(ctx, liveEntry(act));
+  if (act && act.type === 'wire' && act.route) drawItem(ctx, wireEntry(act));
+  if (act && act.type === 'place') drawItem(ctx, placeEntry(act), 0.55);
+  if (act && act.type === 'resize') drawItem(ctx, { ...act.e, w: act.nw, h: act.nw * act.e.h / act.e.w });
+  for (const b of liveBufs.values()){
+    if (b.pts.length >= 3 && b.pts.every(Number.isFinite)) drawItem(ctx, { id: '_', k: 's', t: b.t, c: b.c, w: b.w, line: b.f === 'line' ? 1 : 0, ar: b.f === 'ar' ? 1 : 0, poly: (b.f === 'poly' || b.f === 'open') ? 1 : 0, cl: b.f === 'poly' ? 1 : 0, p: b.pts });
+  }
+  if (st.tool === 'wire' || st.tool === 'sym'){
+    ctx.lineWidth = 1.5 / z; ctx.strokeStyle = T.accent;
+    for (const p of visibleSymPins()){ ctx.beginPath(); ctx.arc(p.x, p.y, 4 / z, 0, Math.PI * 2); ctx.stroke(); }
+    if (act && act.type === 'wire' && act.snapB){ ctx.beginPath(); ctx.arc(act.b[0], act.b[1], 7 / z, 0, Math.PI * 2); ctx.stroke(); }
+  }
+  const simg = singleImage();
+  if (simg && !(act && act.type === 'move')){
+    const s = 7 / z, hx = simg.x + (act && act.type === 'resize' ? act.nw : simg.w), hy = simg.y + (act && act.type === 'resize' ? act.nw * simg.h / simg.w : simg.h);
+    ctx.fillStyle = T.accent; ctx.fillRect(hx - s, hy - s, 2 * s, 2 * s); ctx.strokeStyle = T.paper; ctx.lineWidth = 1.5 / z; ctx.strokeRect(hx - s, hy - s, 2 * s, 2 * s);
+  }
+  if (selBB && selection.size && !(act && act.type === 'resize')){
+    const o = act && act.type === 'move' ? act : { dx: 0, dy: 0 };
+    ctx.save(); ctx.setLineDash([6 / z, 5 / z]); ctx.lineWidth = 1.5 / z; ctx.strokeStyle = T.accent;
+    ctx.strokeRect(selBB.x0 - 6 / z + o.dx, selBB.y0 - 6 / z + o.dy, selBB.x1 - selBB.x0 + 12 / z, selBB.y1 - selBB.y0 + 12 / z); ctx.restore();
+  }
+  if (act && act.type === 'lasso' && act.pts.length > 2){
+    ctx.save(); ctx.setLineDash([5 / z, 5 / z]); ctx.lineWidth = 1.5 / z; ctx.strokeStyle = T.accent;
+    ctx.fillStyle = T.dark ? 'rgba(226,137,74,.08)' : 'rgba(176,94,37,.06)';
+    ctx.beginPath(); ctx.moveTo(act.pts[0], act.pts[1]); for (let i = 2; i < act.pts.length; i += 2) ctx.lineTo(act.pts[i], act.pts[i+1]);
+    ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
+  }
+  if (act && act.type === 'erase'){ ctx.beginPath(); ctx.arc(act.x, act.y, ERASE_R / z, 0, Math.PI * 2); ctx.lineWidth = 1.5 / z; ctx.strokeStyle = T.accent; ctx.stroke(); }
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.font = '600 12px Barlow, system-ui, sans-serif'; ctx.textBaseline = 'middle';
+  for (const p of peers){
+    const cur = p.presence && p.presence.cur;
+    if (!Array.isArray(cur) || !cur.every(Number.isFinite)) continue;
+    const sx = (cur[0] - st.cam.x) * z, sy = (cur[1] - st.cam.y) * z;
+    if (sx < -20 || sy < -20 || sx > W + 20 || sy > H + 20) continue;
+    const col = peerColor(p), name = peerLabel(p);
+    ctx.fillStyle = col; ctx.beginPath(); ctx.arc(sx, sy, 5, 0, Math.PI * 2); ctx.fill();
+    const tw = ctx.measureText(name).width;
+    ctx.beginPath(); ctx.roundRect ? ctx.roundRect(sx + 8, sy + 6, tw + 12, 20, 6) : ctx.rect(sx + 8, sy + 6, tw + 12, 20); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.fillText(name, sx + 14, sy + 16.5);
+  }
+  if (editing) placeTA();
+}
+
+/* ================= kamera ================= */
+function setCam(x, y, z){ st.cam.x = x; st.cam.y = y; st.cam.z = clamp(z, 0.1, 8); staticDirty = true; requestDraw(); updZoom(); saveVP(); }
+function zoomAt(sx, sy, nz){ const c = st.cam; nz = clamp(nz, 0.1, 8); const wx = sx / c.z + c.x, wy = sy / c.z + c.y; setCam(wx - sx / nz, wy - sy / nz, nz); }
+const toWorld = (sx, sy) => [sx / st.cam.z + st.cam.x, sy / st.cam.z + st.cam.y];
+function updZoom(){ $('#zoomBtn').textContent = Math.round(st.cam.z * 100) + ' %'; }
+let vpTimer = null;
+function saveVP(){ clearTimeout(vpTimer); vpTimer = setTimeout(() => st.pid && LS.set('tk:vp:' + st.pid, st.cam), 400); }
+function fitAll(){
+  let bb = null;
+  for (const e of items.values()){ if (e.k === 'd') continue; const b = geom(e).bb; bb = bb ? { x0: Math.min(bb.x0, b.x0), y0: Math.min(bb.y0, b.y0), x1: Math.max(bb.x1, b.x1), y1: Math.max(bb.y1, b.y1) } : { ...b }; }
+  if (!bb){ setCam(-60, -90, 1); return; }
+  const m = 70, z = clamp(Math.min((W - 2 * m) / (bb.x1 - bb.x0 || 1), (H - 2 * m - 120) / (bb.y1 - bb.y0 || 1)), 0.1, 2);
+  setCam((bb.x0 + bb.x1) / 2 - W / 2 / z, (bb.y0 + bb.y1) / 2 - H / 2 / z, z);
+}
+
+/* ================= vstup ================= */
+const ERASE_R = 12;
+const ptrs = new Map();
+let act = null, gesture = null;
+let lastPenSeen = 0, touchPtrSeen = false, roHintAt = 0;
+
+function canEdit(){ return !st.readOnly && !!st.pid; }
+function isDrawPointer(e){
+  if (e.pointerType === 'pen') return true;
+  if (e.pointerType === 'mouse') return e.button === 0;
+  return st.finger && st.tool !== 'hand';
+}
+cv.addEventListener('pointerdown', e => {
+  hidePop();
+  if (editing){ commitText(); return; }
+  if (e.pointerType === 'pen'){
+    lastPenSeen = Date.now();
+    if (gesture){ if (Date.now() - gesture.t0 < 450) setCam(gesture.cam0.x, gesture.cam0.y, gesture.cam0.z); gesture = null; ptrs.clear(); }
+  }
+  if (e.pointerType === 'touch'){
+    touchPtrSeen = true;
+    if (act && act.pointerType === 'pen') return;
+    if (Date.now() - lastPenSeen < 350) return;
+    ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (act && act.pointerType === 'touch') cancelAct();
+    if (ptrs.size >= 2 || !isDrawPointer(e)){ startGesture(); cv.setPointerCapture(e.pointerId); return; }
+  }
+  if (!isDrawPointer(e)){ if (e.pointerType === 'mouse'){ ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY }); startGesture(); } return; }
+  cv.setPointerCapture(e.pointerId);
+  startAct(e);
+});
+cv.addEventListener('pointermove', e => {
+  if (e.pointerType === 'pen') lastPenSeen = Date.now();
+  if (ptrs.has(e.pointerId) && gesture){ ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY }); moveGesture(); return; }
+  if (act && act.pointerId === e.pointerId){ moveAct(e); return; }
+  if (e.pointerType !== 'touch' && named){ const [wx, wy] = toWorld(e.clientX, e.clientY); pres({ cur: [Math.round(wx), Math.round(wy)] }); }
+});
+const endPtr = e => {
+  if (act && act.pointerId === e.pointerId){ ptrs.delete(e.pointerId); if (e.type === 'pointercancel') cancelAct(); else endAct(e); return; }
+  if (ptrs.has(e.pointerId)){ ptrs.delete(e.pointerId); if (gesture){ if (ptrs.size) startGesture(); else gesture = null; } }
+};
+cv.addEventListener('pointerup', endPtr);
+cv.addEventListener('pointercancel', endPtr);
+cv.addEventListener('pointerleave', e => { if (e.pointerType !== 'touch' && !act) pres({ cur: null }); });
+function touchFallback(e){
+  e.preventDefault();
+  if (touchPtrSeen) return;
+  if (act && act.pointerType === 'pen') return;
+  const list = [...e.touches].filter(t => t.touchType !== 'stylus');
+  if (!list.length){ ptrs.clear(); gesture = null; return; }
+  const changed = list.length !== ptrs.size || list.some(t => !ptrs.has('t' + t.identifier));
+  ptrs.clear(); for (const t of list) ptrs.set('t' + t.identifier, { x: t.clientX, y: t.clientY });
+  if (changed || !gesture) startGesture(); else moveGesture();
+}
+for (const ev of ['touchstart', 'touchmove', 'touchend', 'touchcancel']) cv.addEventListener(ev, touchFallback, { passive: false });
+document.addEventListener('gesturestart', e => e.preventDefault());
+document.addEventListener('dblclick', e => e.preventDefault());
+cv.addEventListener('wheel', e => {
+  e.preventDefault();
+  if (e.ctrlKey || e.metaKey) zoomAt(e.clientX, e.clientY, st.cam.z * Math.exp(-e.deltaY * 0.01));
+  else setCam(st.cam.x + e.deltaX / st.cam.z, st.cam.y + e.deltaY / st.cam.z, st.cam.z);
+}, { passive: false });
+
+function startGesture(){
+  const pts = [...ptrs.values()], c = centroid(pts);
+  gesture = { d: pts.length > 1 ? dist(pts[0], pts[1]) : 0, z: st.cam.z, w: toWorld(c.x, c.y), t0: gesture ? gesture.t0 : Date.now(), cam0: gesture ? gesture.cam0 : { ...st.cam } };
+}
+function moveGesture(){
+  const pts = [...ptrs.values()]; if (!pts.length) return;
+  const c = centroid(pts);
+  let z = gesture.z;
+  if (pts.length > 1 && gesture.d > 0) z = clamp(gesture.z * dist(pts[0], pts[1]) / gesture.d, 0.1, 8);
+  setCam(gesture.w[0] - c.x / z, gesture.w[1] - c.y / z, z);
+}
+const centroid = pts => ({ x: pts.reduce((s, p) => s + p.x, 0) / pts.length, y: pts.reduce((s, p) => s + p.y, 0) / pts.length });
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+
+function hitSymbol(wx, wy){
+  let found = null;
+  for (const e of items.values()){ if (e.k !== 'y' || e.k === 'd') continue; const b = geom(e).bb; if (wx >= b.x0 && wx <= b.x1 && wy >= b.y0 && wy <= b.y1) found = e; }
+  return found;
+}
+function startMove(base, wx, wy, snapMove){
+  const a = { ...base, type: 'move', wx, wy, dx: 0, dy: 0, snap: snapMove, follow: [] };
+  const syms = [...selection].map(id => items.get(id)).filter(e => e && e.k === 'y');
+  a.affected = [];
+  if (syms.length){
+    const ids = new Set(syms.map(s => s.id));
+    for (const w of items.values()) if (w.k === 's' && w.wi && !selection.has(w.id) && ((w.a && ids.has(w.a.s)) || (w.b && ids.has(w.b.s)))) a.affected.push(w);
+  }
+  for (const id of selection) hidden.add(id);
+  for (const w of a.affected) hidden.add(w.id);
+  staticDirty = true; requestDraw();
+  return a;
+}
+function startAct(e){
+  const [wx, wy] = toWorld(e.clientX, e.clientY);
+  const base = { pointerId: e.pointerId, pointerType: e.pointerType, sx: e.clientX, sy: e.clientY };
+  const tool = st.tool;
+  if (tool === 'hand'){ act = { ...base, type: 'pan', cam: { ...st.cam } }; return; }
+  if (!canEdit()){
+    act = { ...base, type: 'pan', cam: { ...st.cam } };
+    if (st.readOnly && Date.now() - roHintAt > 8000){ roHintAt = Date.now(); toast('Máš jen právo ke čtení. Požádej vlastníka o roli Contributor.'); }
+    return;
+  }
+  const simg = singleImage();
+  if (simg && (tool === 'lasso' || tool === 'sym') && Math.hypot(wx - simg.x - simg.w, wy - simg.y - simg.h) * st.cam.z < 24){
+    act = { ...base, type: 'resize', e: simg, nw: simg.w }; hidden.add(simg.id); staticDirty = true; requestDraw(); return;
+  }
+  if (selection.size && selBB && (tool === 'lasso' || tool === 'sym')){
+    const p = 10 / st.cam.z;
+    if (wx >= selBB.x0 - p && wx <= selBB.x1 + p && wy >= selBB.y0 - p && wy <= selBB.y1 + p){
+      act = startMove(base, wx, wy, selHasSchematic()); act.tap = true; return;
+    }
+  }
+  if (tool !== 'lasso') clearSelection();
+  if (tool === 'pen' || tool === 'hl'){
+    act = { ...base, type: 'draw', id: rid(), t: tool, c: tool === 'hl' ? st.hlColor : st.penColor,
+      w: tool === 'hl' ? HL_W[st.hlW] : PEN_W[st.penW], pts: [], smx: wx, smy: wy, shape: null, holdT: null, hx: e.clientX, hy: e.clientY, lastLive: 0 };
+    addPt(act, wx, wy, pressureOf(e)); armHold(act); requestDraw(); return;
+  }
+  if (tool === 'eraser'){ act = { ...base, type: 'erase', x: wx, y: wy, hit: new Set() }; eraseAt(wx, wy); return; }
+  if (tool === 'lasso'){ clearSelection(); act = { ...base, type: 'lasso', pts: [wx, wy] }; requestDraw(); return; }
+  if (tool === 'text'){ act = { ...base, type: 'tap', wx, wy }; return; }
+  if (tool === 'wire'){
+    const s = snapWire(wx, wy);
+    act = { ...base, type: 'wire', id: rid(), a: s.pt, attA: s.att, b: s.pt, attB: s.att, snapB: !!s.att, horiz: null, route: null, lastLive: 0 };
+    requestDraw(); return;
+  }
+  if (tool === 'sym'){
+    const hit = hitSymbol(wx, wy);
+    if (hit){ selection = new Set([hit.id]); updateSelBB(); act = startMove(base, wx, wy, true); act.tap = true; return; }
+    if (st.armed && getDef(st.armed)){ act = { ...base, type: 'place', wx, wy }; requestDraw(); return; }
+    act = { ...base, type: 'pan', cam: { ...st.cam } }; return;
+  }
+}
+function pressureOf(e){ return e.pointerType === 'pen' ? (e.pressure > 0 ? e.pressure : 0.4) : 0.5; }
+function moveAct(e){
+  const a = act;
+  if (a.type === 'pan'){ setCam(a.cam.x - (e.clientX - a.sx) / st.cam.z, a.cam.y - (e.clientY - a.sy) / st.cam.z, st.cam.z); return; }
+  const evs = (e.getCoalescedEvents && e.getCoalescedEvents().length) ? e.getCoalescedEvents() : [e];
+  const [wx, wy] = toWorld(e.clientX, e.clientY);
+  if (a.type === 'draw'){
+    for (const ce of evs){
+      const [cx, cy] = toWorld(ce.clientX, ce.clientY);
+      if (a.shape){ if (a.shape.kind === 'line') setLineEnd(a, cx, cy); }
+      else addPt(a, cx, cy, pressureOf(ce));
+    }
+    if (!a.shape && Math.hypot(e.clientX - a.hx, e.clientY - a.hy) > 3){ a.hx = e.clientX; a.hy = e.clientY; armHold(a); }
+    sendLive(a); requestDraw(); return;
+  }
+  if (a.type === 'erase'){ for (const ce of evs){ const [cx, cy] = toWorld(ce.clientX, ce.clientY); a.x = cx; a.y = cy; eraseAt(cx, cy); } requestDraw(); return; }
+  if (a.type === 'lasso'){ a.pts.push(wx, wy); requestDraw(); return; }
+  if (a.type === 'move'){
+    let dx = wx - a.wx, dy = wy - a.wy;
+    if (Math.hypot(e.clientX - a.sx, e.clientY - a.sy) > 6) a.tap = false;
+    if (a.snap){ dx = sg(dx); dy = sg(dy); }
+    if (dx !== a.dx || dy !== a.dy){
+      a.dx = dx; a.dy = dy;
+      if (a.affected.length){ const ns = movedSyms(dx, dy, false); a.follow = wireFollow(ns, new Set(selection), a.affected, false); }
+    }
+    requestDraw(); return;
+  }
+  if (a.type === 'wire'){
+    const s = snapWire(wx, wy, a.id);
+    a.b = s.pt; a.attB = s.att; a.snapB = !!s.att;
+    const dx = a.b[0] - a.a[0], dy = a.b[1] - a.a[1];
+    if (a.horiz == null && Math.hypot(dx, dy) >= G / 2) a.horiz = Math.abs(dx) >= Math.abs(dy);
+    a.route = routeL(a.a, a.b, a.horiz !== false);
+    sendLive(a); requestDraw(); return;
+  }
+  if (a.type === 'place'){ a.wx = wx; a.wy = wy; requestDraw(); return; }
+  if (a.type === 'resize'){ let nw = Math.max(G, wx - a.e.x); if (st.snap) nw = Math.max(G, sg(nw)); a.nw = nw; requestDraw(); return; }
+}
+function endAct(e){
+  const a = act; act = null;
+  if (!a) return;
+  clearTimeout(a.holdT);
+  if (a.type === 'draw'){
+    pres({ live: null });
+    const entry = liveEntry(a); entry.v = nv();
+    if (a.shape && a.shape.kind === 'line'){ const p = entry.p; if (Math.hypot(p[3] - p[0], p[4] - p[1]) < 1){ requestDraw(); return; } }
+    commitOp([entry]); return;
+  }
+  if (a.type === 'erase'){
+    const del = [...a.hit].map(id => ({ id, k: 'd', v: nv() }));
+    for (const id of a.hit) hidden.delete(id);
+    commitOp(del); staticDirty = true; requestDraw(); return;
+  }
+  if (a.type === 'lasso'){ finishLasso(a.pts); requestDraw(); return; }
+  if (a.type === 'move'){
+    for (const id of selection) hidden.delete(id);
+    for (const w of a.affected) hidden.delete(w.id);
+    if (!a.tap && (a.dx || a.dy) && (Math.abs(a.dx) + Math.abs(a.dy) > 0.5)){
+      const ns = movedSyms(a.dx, a.dy, true), out = [...ns.values()];
+      const movedIds = new Set(selection);
+      for (const id of selection){
+        const it = items.get(id); if (!it || it.k === 'd' || it.k === 'y') continue;
+        const t = translate(it, a.dx, a.dy);
+        if (t.wi){ if (t.a && !movedIds.has(t.a.s)) delete t.a; if (t.b && !movedIds.has(t.b.s)) delete t.b; }
+        out.push(t);
+      }
+      out.push(...wireFollow(ns, movedIds, a.affected, true));
+      commitOp(out);
+    }
+    staticDirty = true; updateSelBB(); requestDraw(); return;
+  }
+  if (a.type === 'tap'){
+    if (Math.hypot(e.clientX - a.sx, e.clientY - a.sy) > 8) return;
+    const hit = hitText(a.wx, a.wy);
+    if (hit) startText(hit); else startText(null, a.wx, a.wy - 13);
+    return;
+  }
+  if (a.type === 'wire'){
+    pres({ live: null });
+    if (!a.route || a.route.length < 2 || (a.a[0] === a.b[0] && a.a[1] === a.b[1])){ requestDraw(); return; }
+    commitOp([{ ...wireEntry(a), v: nv() }]); return;
+  }
+  if (a.type === 'resize'){
+    hidden.delete(a.e.id);
+    if (Math.abs(a.nw - a.e.w) > 0.5) commitOp([{ ...a.e, v: nv(), w: q(a.nw), h: q(a.nw * a.e.h / a.e.w) }]);
+    staticDirty = true; updateSelBB(); requestDraw(); return;
+  }
+  if (a.type === 'place'){
+    const ent = placeEntry(a); ent.v = nv();
+    commitOp([ent]); selection = new Set([ent.id]); updateSelBB(); requestDraw(); return;
+  }
+}
+function cancelAct(){
+  const a = act; act = null; if (!a) return;
+  clearTimeout(a.holdT);
+  if (a.type === 'draw' || a.type === 'wire') pres({ live: null });
+  if (a.type === 'erase') for (const id of a.hit) hidden.delete(id);
+  if (a.type === 'move'){ for (const id of selection) hidden.delete(id); for (const w of a.affected) hidden.delete(w.id); }
+  if (a.type === 'resize') hidden.delete(a.e.id);
+  staticDirty = true; requestDraw();
+}
+
+/* tah */
+function addPt(a, wx, wy, pr){
+  const P = a.pts, n = P.length;
+  if (n){
+    const k = a.pointerType === 'pen' ? 0.62 : 0.45;
+    a.smx += (wx - a.smx) * k; a.smy += (wy - a.smy) * k;
+    if (Math.hypot(a.smx - P[n-3], a.smy - P[n-2]) * st.cam.z < 0.9) return;
+    P.push(q(a.smx), q(a.smy), Math.round(pr * 100));
+  } else { a.smx = wx; a.smy = wy; P.push(q(wx), q(wy), Math.round(pr * 100)); }
+}
+function armHold(a){
+  clearTimeout(a.holdT);
+  a.holdT = setTimeout(() => {
+    if (act !== a || a.shape || a.pts.length < 12) return;
+    const sh = recognize(a.pts, st.cam.z, st.snap ? G : 0);
+    if (!sh) return;
+    const P = a.pts, n = P.length / 3;
+    let avg = 0; for (let i = 0; i < n; i++) avg += P[i*3+2]; avg = avg / n / 100;
+    if (a.t === 'pen') a.w = Math.max(0.8, radius(a.w, avg) * 2);
+    a.shape = sh;
+    if (sh.kind === 'line'){ a.ax = sh.ax; a.ay = sh.ay; setLineEnd(a, P[(n-1)*3], P[(n-1)*3+1]); }
+    if (navigator.vibrate) try { navigator.vibrate(8); } catch {}
+    requestDraw(); sendLive(a, true);
+  }, 520);
+}
+function setLineEnd(a, wx, wy){
+  let bx = wx, by = wy;
+  if (st.snap){ bx = sg(bx); by = sg(by); }
+  else {
+    const ang = Math.atan2(by - a.ay, bx - a.ax), len = Math.hypot(bx - a.ax, by - a.ay);
+    const s = Math.round(ang / (Math.PI / 4)) * (Math.PI / 4);
+    if (Math.abs(ang - s) < 0.12){ bx = a.ax + Math.cos(s) * len; by = a.ay + Math.sin(s) * len; }
+  }
+  a.bx = bx; a.by = by;
+}
+function liveEntry(a){
+  const base = { id: a.id, k: 's', t: a.t, c: a.c, w: a.w };
+  const sh = a.shape;
+  if (sh && sh.kind === 'line') return { ...base, line: 1, p: [q(a.ax), q(a.ay), 50, q(a.bx), q(a.by), 50] };
+  if (sh && sh.kind === 'arrow') return { ...base, ar: 1, p: sh.p.slice() };
+  if (sh && sh.kind === 'poly') return { ...base, poly: 1, cl: 1, p: sh.p.slice() };
+  return { ...base, p: a.pts.slice() };
+}
+function sendLive(a, force){
+  if (!named) return;
+  const now = performance.now(); if (!force && now - a.lastLive < 60) return; a.lastLive = now;
+  const e = a.type === 'wire' ? wireEntry(a) : liveEntry(a);
+  if (!e.p || e.p.length < 3) return;
+  const n = e.p.length / 3, shape = isShape(e), o = shape ? 0 : Math.max(0, n - LIVE_MAX);
+  const f = e.line ? 'line' : e.ar ? 'ar' : e.poly ? (e.cl ? 'poly' : 'open') : '';
+  pres({ live: { id: a.id, t: e.t, c: e.c, w: e.w, f, o, p: e.p.slice(o * 3) }, cur: [Math.round(e.p[e.p.length - 3]), Math.round(e.p[e.p.length - 2])] });
+}
+
+/* rozpoznávání tvarů */
+const hyp = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+function rdp(pts, eps){
+  const keep = new Uint8Array(pts.length); keep[0] = keep[pts.length - 1] = 1;
+  const stack = [[0, pts.length - 1]];
+  while (stack.length){
+    const [a, b] = stack.pop(); let md = 0, mi = -1;
+    for (let i = a + 1; i < b; i++){ const d = segDist(pts[i][0], pts[i][1], pts[a][0], pts[a][1], pts[b][0], pts[b][1]); if (d > md){ md = d; mi = i; } }
+    if (md > eps){ keep[mi] = 1; stack.push([a, mi], [mi, b]); }
+  }
+  const out = []; keep.forEach((k, i) => { if (k) out.push(i); }); return out;
+}
+function maxDev(pts, from, to, A, B){ let d = 0; for (let i = from; i <= to; i++) d = Math.max(d, segDist(pts[i][0], pts[i][1], A[0], A[1], B[0], B[1])); return d; }
+const flat3 = pts => pts.flatMap(([x, y]) => [q(x), q(y), 50]);
+const pairs3 = p => { const o = []; for (let i = 0; i < p.length; i += 3) o.push([p[i], p[i+1]]); return o; };
+function recognize(P, z, step){
+  const sn = v => step ? Math.round(v / step) * step : v;
+  const n = P.length / 3, pts = pairs3(P);
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity, len = 0;
+  pts.forEach(([x, y], i) => { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); if (i) len += hyp(pts[i], pts[i-1]); });
+  const w = x1 - x0, h = y1 - y0, diag = Math.hypot(w, h);
+  if (diag * z < 18) return null;
+  const A = pts[0], Z = pts[n-1];
+  const closed = hyp(A, Z) < 0.25 * diag && len > 1.8 * diag;
+  if (!closed){
+    const chord = hyp(A, Z);
+    if (chord > 0.6 * diag && maxDev(pts, 0, n - 1, A, Z) < Math.max(0.09 * chord, 3 / z)) return { kind: 'line', ax: sn(A[0]), ay: sn(A[1]) };
+    const V = rdp(pts, 0.07 * diag);
+    if (V.length >= 3){
+      let k = 0, best = 0; V.forEach((vi, i) => { const d = hyp(pts[vi], A); if (d > best){ best = d; k = i; } });
+      if (k >= 1 && k < V.length - 1){
+        const bi = V[k], B = pts[bi], nx = pts[V[k+1]];
+        let head = 0; for (let i = k; i < V.length - 1; i++) head += hyp(pts[V[i]], pts[V[i+1]]);
+        const near = V.slice(k + 1).every(vi => hyp(pts[vi], B) < 0.5 * best);
+        const ba = [A[0] - B[0], A[1] - B[1]], bn = [nx[0] - B[0], nx[1] - B[1]];
+        const cos = (ba[0] * bn[0] + ba[1] * bn[1]) / ((Math.hypot(...ba) * Math.hypot(...bn)) || 1);
+        if (near && head > 0.12 * best && cos > 0.2 && maxDev(pts, 0, bi, A, B) < 0.12 * best){
+          const a = [sn(A[0]), sn(A[1])], b = [sn(B[0]), sn(B[1])];
+          if (hyp(a, b) > 1) return { kind: 'arrow', p: flat3([a, b]) };
+        }
+      }
+    }
+    return null;
+  }
+  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, rx = w / 2 || 1, ry = h / 2 || 1;
+  let ee = 0; for (const [x, y] of pts) ee += Math.abs(Math.hypot((x - cx) / rx, (y - cy) / ry) - 1); ee /= n;
+  let ai = 0, md = -1; pts.forEach((pt, i) => { const d = Math.hypot(pt[0] - cx, pt[1] - cy); if (d > md){ md = d; ai = i; } });
+  const loop = pts.slice(ai).concat(pts.slice(0, ai)); loop.push(loop[0]);
+  let C = rdp(loop, 0.06 * diag).map(i => loop[i]); C.pop();
+  C = C.filter((c, i) => i === 0 || hyp(c, C[i-1]) > 0.15 * diag);
+  if (C.length > 2 && hyp(C[0], C[C.length - 1]) < 0.15 * diag) C.pop();
+  // odstranit téměř přímé „rohy“ (ručně kreslená strana s mírným ohybem)
+  for (let changed = true; changed && C.length > 3;){
+    changed = false; let wi = -1, wa = 0.7;
+    for (let i = 0; i < C.length; i++){
+      const a = C[(i + C.length - 1) % C.length], b = C[i], c = C[(i + 1) % C.length];
+      const a1 = Math.atan2(b[1] - a[1], b[0] - a[0]), a2 = Math.atan2(c[1] - b[1], c[0] - b[0]);
+      let d = Math.abs(a2 - a1); if (d > Math.PI) d = 2 * Math.PI - d;
+      if (d < wa){ wa = d; wi = i; }
+    }
+    if (wi >= 0){ C.splice(wi, 1); changed = true; }
+  }
+  let pe = Infinity;
+  if (C.length >= 3){
+    pe = 0;
+    for (const [x, y] of pts){ let m = Infinity; for (let i = 0; i < C.length; i++){ const a = C[i], b = C[(i + 1) % C.length]; m = Math.min(m, segDist(x, y, a[0], a[1], b[0], b[1])); } pe += m; }
+    pe /= n;
+  }
+  let poly = (C.length === 3 || C.length === 4) && pe < 0.045 * diag;
+  let ell = ee < 0.16;
+  if (poly && ell){ if (pe <= ee * (rx + ry) / 2 * 0.9) ell = false; else poly = false; }
+  if (ell){
+    let ex = cx, ey = cy, erx = rx, ery = ry;
+    if (Math.abs(rx - ry) < 0.15 * Math.max(rx, ry)){
+      let r = (rx + ry) / 2;
+      if (step){ ex = sn(cx); ey = sn(cy); r = Math.max(step / 2, Math.round(r / (step / 2)) * (step / 2)); }
+      erx = ery = r;
+    } else if (step){
+      const X0 = sn(x0), X1 = sn(x1), Y0 = sn(y0), Y1 = sn(y1);
+      if (X1 > X0 && Y1 > Y0){ ex = (X0 + X1) / 2; ey = (Y0 + Y1) / 2; erx = (X1 - X0) / 2; ery = (Y1 - Y0) / 2; }
+    }
+    const out = []; for (let i = 0; i < 72; i++){ const t = i / 72 * Math.PI * 2; out.push([ex + Math.cos(t) * erx, ey + Math.sin(t) * ery]); }
+    return { kind: 'poly', p: flat3(out) };
+  }
+  if (poly){
+    let out = C;
+    if (C.length === 4){
+      const axis = C.every((c, i) => { const d = C[(i + 1) % 4]; const ang = Math.abs(Math.atan2(d[1] - c[1], d[0] - c[0])) % (Math.PI / 2); return Math.min(ang, Math.PI / 2 - ang) < 0.28; });
+      if (axis){
+        let X0 = Math.min(...C.map(c => c[0])), X1 = Math.max(...C.map(c => c[0])), Y0 = Math.min(...C.map(c => c[1])), Y1 = Math.max(...C.map(c => c[1]));
+        const rw = X1 - X0, rh = Y1 - Y0, sq = Math.abs(rw - rh) < 0.15 * Math.max(rw, rh);
+        if (sq){ const s2 = (rw + rh) / 4, mx = (X0 + X1) / 2, my = (Y0 + Y1) / 2; X0 = mx - s2; X1 = mx + s2; Y0 = my - s2; Y1 = my + s2; }
+        if (step){ const sx0 = sn(X0), sy0 = sn(Y0); const sw = Math.max(step, sn(X1 - X0)); const shh = sq ? sw : Math.max(step, sn(Y1 - Y0)); X0 = sx0; Y0 = sy0; X1 = sx0 + sw; Y1 = sy0 + shh; }
+        out = [[X0, Y0], [X1, Y0], [X1, Y1], [X0, Y1]];
+      } else out = C.map(c => [sn(c[0]), sn(c[1])]);
+    } else out = C.map(c => [sn(c[0]), sn(c[1])]);
+    out = out.filter((c, i) => i === 0 || hyp(c, out[i-1]) > 0.5);
+    if (out.length >= 3) return { kind: 'poly', p: flat3(out) };
+  }
+  return null;
+}
+
+/* ================= vodiče ================= */
+function snapWire(wx, wy, ignoreWire){
+  const r = 14 / st.cam.z;
+  let best = null, bd = r;
+  for (const p of visibleSymPins()){ const d = Math.hypot(p.x - wx, p.y - wy); if (d <= bd){ bd = d; best = p; } }
+  if (best) return { pt: [best.x, best.y], att: { s: best.s, i: best.i } };
+  return { pt: [sg(wx), sg(wy)], att: null };
+}
+function simplifyRoute(pts){
+  const o = [];
+  for (const p of pts){ if (o.length && o[o.length-1][0] === p[0] && o[o.length-1][1] === p[1]) continue; o.push(p); }
+  for (let i = o.length - 2; i >= 1; i--){
+    const a = o[i-1], b = o[i], c = o[i+1];
+    if ((a[0] === b[0] && b[0] === c[0]) || (a[1] === b[1] && b[1] === c[1])) o.splice(i, 1);
+  }
+  return o;
+}
+const routeL = (a, b, horizFirst) => simplifyRoute([a, horizFirst ? [b[0], a[1]] : [a[0], b[1]], b]);
+function wireEntry(a){
+  const e = { id: a.id, k: 's', t: 'pen', wi: 1, poly: 1, c: st.penColor, w: WIRE_W, p: flat3(a.route || [a.a, a.b]) };
+  if (a.attA) e.a = a.attA; if (a.attB) e.b = a.attB;
+  return e;
+}
+function moveEnd(pts, E){       // posune první bod trasy do E a zachová pravoúhlost
+  if (pts.length === 1) return [E];
+  const O = pts[0], P = pts[1];
+  const horiz = Math.abs(O[1] - P[1]) < 0.01 && Math.abs(O[0] - P[0]) >= 0.01;
+  const corner = horiz ? [E[0], P[1]] : [P[0], E[1]];
+  return simplifyRoute([E, corner, ...pts.slice(1)]);
+}
+function pinOut(sym, i){          // směr ven ze značky u daného vývodu: [dx, dy] po ose
+  const gm = symGeom(sym), p = gm.pins[i]; if (!p) return [1, 0];
+  const cx = (gm.bb.x0 + gm.bb.x1) / 2, cy = (gm.bb.y0 + gm.bb.y1) / 2, dx = p[0] - cx, dy = p[1] - cy;
+  return Math.abs(dx) >= Math.abs(dy) ? [Math.sign(dx) || 1, 0] : [0, Math.sign(dy) || 1];
+}
+function routeFromPin(P, out, F){
+  const horiz = out[0] !== 0;
+  const along = horiz ? (F[0] - P[0]) * out[0] : (F[1] - P[1]) * out[1];
+  if (along >= G) return routeL(P, F, horiz);                     // cíl leží ve směru ven: stačí „L“
+  const Q = [P[0] + out[0] * G, P[1] + out[1] * G];               // nejdřív krok ven, pak kolem
+  return simplifyRoute([P, ...routeL(Q, F, !horiz)]);
+}
+function movedSyms(dx, dy, withV){
+  const m = new Map();
+  for (const id of selection){ const e = items.get(id); if (e && e.k === 'y') m.set(id, { ...e, v: withV ? nv() : e.v, x: e.x + dx, y: e.y + dy }); }
+  return m;
+}
+function wireFollow(newSyms, movedIds, list, withV){
+  const out = [];
+  const src = list || [...items.values()].filter(w => w.k === 's' && w.wi);
+  for (const w of src){
+    if (movedIds.has(w.id)) continue;
+    const ea = w.a && newSyms.get(w.a.s), eb = w.b && newSyms.get(w.b.s);
+    if (!ea && !eb) continue;
+    let pts = pairs3(w.p);
+    if (ea){ const pn = symGeom(ea).pins[w.a.i]; if (pn) pts = moveEnd(pts, pn); }
+    if (eb){ const pn = symGeom(eb).pins[w.b.i]; if (pn) pts = moveEnd(pts.slice().reverse(), pn).reverse(); }
+    if (pairs3(w.p).length <= 3 && pts.length >= 2){   // jednoduchý vodič: nová trasa vychází z vývodu směrem ven ze značky
+      if (ea) pts = routeFromPin(pts[0], pinOut(ea, w.a.i), pts[pts.length - 1]);
+      else pts = routeFromPin(pts[pts.length - 1], pinOut(eb, w.b.i), pts[0]).reverse();
+    }
+    out.push({ ...w, v: withV ? nv() : w.v, p: flat3(pts) });
+  }
+  return out;
+}
+function placeEntry(a){
+  const def = getDef(st.armed), [cx, cy] = symCenter(def);
+  return { id: a.id || (a.id = rid()), k: 'y', sid: st.armed, x: sg(a.wx - cx), y: sg(a.wy - cy), r: 0, m: 0, c: st.penColor, v: 0 };
+}
+function transformSel(kind){
+  const ns = new Map();
+  for (const id of selection){
+    const e = items.get(id); if (!e || e.k !== 'y') continue;
+    ns.set(id, { ...e, v: nv(), r: kind === 'rot' ? ((e.r || 0) + 1) % 4 : (e.r || 0), m: kind === 'mir' ? (e.m ? 0 : 1) : (e.m || 0) });
+  }
+  if (!ns.size) return;
+  commitOp([...ns.values(), ...wireFollow(ns, new Set(ns.keys()), null, true)]);
+  updateSelBB(); requestDraw();
+}
+const selHasSchematic = () => [...selection].some(id => { const e = items.get(id); return e && (e.k === 'y' || e.wi); });
+
+/* guma */
+function segDist(px, py, ax, ay, bx, by){
+  const dx = bx - ax, dy = by - ay, l = dx * dx + dy * dy;
+  let t = l ? ((px - ax) * dx + (py - ay) * dy) / l : 0; t = clamp(t, 0, 1);
+  return Math.hypot(px - ax - t * dx, py - ay - t * dy);
+}
+function eraseAt(x, y){
+  const r = ERASE_R / st.cam.z, box = { x0: x - r, y0: y - r, x1: x + r, y1: y + r };
+  let ch = false;
+  for (const e of items.values()){
+    if (e.k === 'd' || act.hit.has(e.id)) continue;
+    const gm = geom(e); if (!inter(gm.bb, box)) continue;
+    let hit = false;
+    if (e.k === 'i') continue;                       // obrázky guma nemaže (jen výběr → Smazat)
+    if (e.k === 't' || e.k === 'y') hit = true;
+    else {
+      const p = e.p, n = p.length / 3, tol = r + (e.t === 'hl' ? e.w / 2 : e.w);
+      if (n === 1) hit = Math.hypot(p[0] - x, p[1] - y) <= tol;
+      for (let i = 0; i < n - 1 && !hit; i++) if (segDist(x, y, p[i*3], p[i*3+1], p[i*3+3], p[i*3+4]) <= tol) hit = true;
+      if (!hit && e.cl && n > 2 && segDist(x, y, p[(n-1)*3], p[(n-1)*3+1], p[0], p[1]) <= tol) hit = true;
+    }
+    if (hit){ act.hit.add(e.id); hidden.add(e.id); ch = true; }
+  }
+  if (ch){ staticDirty = true; requestDraw(); }
+}
+
+/* laso + výběr */
+function inPoly(x, y, P){
+  let c = false;
+  for (let i = 0, j = P.length - 2; i < P.length; j = i, i += 2){
+    const xi = P[i], yi = P[i+1], xj = P[j], yj = P[j+1];
+    if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c;
+  }
+  return c;
+}
+function pickAt(x, y){
+  const tol = 8 / st.cam.z; let top = null, img = null;
+  for (const e of items.values()){
+    if (e.k === 'd') continue;
+    const b = geom(e).bb; if (x < b.x0 - tol || x > b.x1 + tol || y < b.y0 - tol || y > b.y1 + tol) continue;
+    if (e.k === 's'){
+      const p = e.p, n = p.length / 3, t = tol + e.w; let hit = n === 1 && Math.hypot(p[0] - x, p[1] - y) <= t;
+      for (let i = 0; i < n - 1 && !hit; i++) if (segDist(x, y, p[i*3], p[i*3+1], p[i*3+3], p[i*3+4]) <= t) hit = true;
+      if (!hit) continue;
+    }
+    if (e.k === 'i') img = e; else top = e;
+  }
+  return top || img;
+}
+function finishLasso(P){
+  selection = new Set();
+  let lx0 = Infinity, ly0 = Infinity, lx1 = -Infinity, ly1 = -Infinity;
+  for (let i = 0; i < P.length; i += 2){ lx0 = Math.min(lx0, P[i]); lx1 = Math.max(lx1, P[i]); ly0 = Math.min(ly0, P[i+1]); ly1 = Math.max(ly1, P[i+1]); }
+  if ((lx1 - lx0) * st.cam.z < 8 && (ly1 - ly0) * st.cam.z < 8){        // klepnutí lasem = výběr jednoho objektu
+    const it = pickAt(P[0], P[1]); if (it) selection.add(it.id); updateSelBB(); return;
+  }
+  if (P.length >= 6){
+    for (const e of items.values()){
+      if (e.k === 'd') continue;
+      if (e.k === 't' || e.k === 'y' || e.k === 'i'){ const b = geom(e).bb; if (inPoly((b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2, P)) selection.add(e.id); continue; }
+      const n = e.p.length / 3, step = Math.max(1, Math.floor(n / 24)); let inn = 0, tot = 0;
+      for (let i = 0; i < n; i += step){ tot++; if (inPoly(e.p[i*3], e.p[i*3+1], P)) inn++; }
+      if (inn / tot >= 0.5) selection.add(e.id);
+    }
+  }
+  updateSelBB();
+}
+function updateSelBB(){
+  let bb = null, hasSym = false, hasFree = false;
+  for (const id of selection){ const e = items.get(id); if (!e || e.k === 'd') continue; if (e.k === 'y') hasSym = true; if (isFree(e)) hasFree = true; const b = geom(e).bb; bb = bb ? { x0: Math.min(bb.x0, b.x0), y0: Math.min(bb.y0, b.y0), x1: Math.max(bb.x1, b.x1), y1: Math.max(bb.y1, b.y1) } : { ...b }; }
+  selBB = bb;
+  $('#selbar').classList.toggle('on', !!bb && selection.size > 0 && canEdit());
+  $('#rotBtn').style.display = $('#mirBtn').style.display = hasSym ? '' : 'none';
+  $('#strBtn').style.display = hasFree ? '' : 'none';
+  $('#schBtn').style.display = hasFree && sampleCap ? '' : 'none';
+  $('#selCount').textContent = selection.size === 1 ? '1 objekt' : selection.size < 5 ? selection.size + ' objekty' : selection.size + ' objektů';
+}
+function clearSelection(){ if (!selection.size) return; selection = new Set(); updateSelBB(); requestDraw(); }
+function translate(e, dx, dy){
+  if (e.k === 't' || e.k === 'y' || e.k === 'i') return { ...e, v: nv(), x: q(e.x + dx), y: q(e.y + dy) };
+  return { ...e, v: nv(), p: e.p.map((v, i) => i % 3 === 0 ? q(v + dx) : i % 3 === 1 ? q(v + dy) : v) };
+}
+$('#delBtn').onclick = () => { commitOp([...selection].map(id => ({ id, k: 'd', v: nv() }))); clearSelection(); };
+$('#dupBtn').onclick = () => {
+  const out = [], map = new Map();
+  for (const id of selection){ const e = items.get(id); if (e && e.k !== 'd') map.set(id, rid()); }
+  for (const id of map.keys()){
+    const t = { ...translate(items.get(id), G, G), id: map.get(id) };
+    if (t.wi){ if (t.a){ if (map.has(t.a.s)) t.a = { ...t.a, s: map.get(t.a.s) }; else delete t.a; } if (t.b){ if (map.has(t.b.s)) t.b = { ...t.b, s: map.get(t.b.s) }; else delete t.b; } }
+    out.push(t);
+  }
+  commitOp(out); selection = new Set(out.map(e => e.id)); updateSelBB(); requestDraw();
+};
+$('#rotBtn').onclick = () => transformSel('rot');
+$('#strBtn').onclick = () => straightenSel();
+$('#schBtn').onclick = () => schemaSel();
+$('#mirBtn').onclick = () => transformSel('mir');
+
+/* text */
+const ta = $('#ta');
+let editing = null;
+function hitText(x, y){
+  let found = null;
+  for (const e of items.values()){ if (e.k !== 't') continue; const b = geom(e).bb; if (x >= b.x0 && x <= b.x1 && y >= b.y0 && y <= b.y1) found = e; }
+  return found;
+}
+function startText(e, x, y){
+  editing = e ? { id: e.id, x: e.x, y: e.y, fs: e.fs, c: e.c } : { id: null, x: q(x), y: q(y), fs: 22, c: st.penColor };
+  if (e){ hidden.add(e.id); staticDirty = true; }
+  ta.value = e ? e.txt : '';
+  ta.style.display = 'block'; placeTA(); autosize();
+  ta.focus({ preventScroll: true }); requestDraw();
+}
+function placeTA(){
+  const z = st.cam.z, ed = editing;
+  ta.style.left = ((ed.x - st.cam.x) * z - 3) + 'px'; ta.style.top = ((ed.y - st.cam.y) * z - 3) + 'px';
+  ta.style.fontSize = (ed.fs * z) + 'px'; ta.style.color = colorOf(ed.c); ta.style.padding = '2px';
+}
+function autosize(){ ta.style.width = '10px'; ta.style.height = '10px'; ta.style.width = Math.max(80, ta.scrollWidth + 12) + 'px'; ta.style.height = ta.scrollHeight + 'px'; }
+ta.addEventListener('input', autosize);
+ta.addEventListener('keydown', e => { if (e.key === 'Escape'){ e.preventDefault(); commitText(); } e.stopPropagation(); });
+ta.addEventListener('blur', () => { if (editing) commitText(); });
+function commitText(){
+  const ed = editing; if (!ed) return; editing = null;
+  ta.style.display = 'none'; ta.blur();
+  if (ed.id) hidden.delete(ed.id);
+  const txt = ta.value.replace(/\s+$/, '');
+  const cur = ed.id ? items.get(ed.id) : null;
+  if (!txt){ if (cur && cur.k !== 'd') commitOp([{ id: ed.id, k: 'd', v: nv() }]); }
+  else if (!cur || cur.txt !== txt) commitOp([{ id: ed.id || rid(), v: nv(), k: 't', x: ed.x, y: ed.y, txt, c: ed.c, fs: ed.fs }]);
+  staticDirty = true; requestDraw();
+}
+
+/* klávesnice */
+document.addEventListener('keydown', e => {
+  if (ED.open) return;
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+  const mod = e.metaKey || e.ctrlKey;
+  if (mod && e.key.toLowerCase() === 'z'){ e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
+  if ((e.key === 'Delete' || e.key === 'Backspace') && selection.size){ e.preventDefault(); $('#delBtn').click(); return; }
+  if (e.key === 'Escape'){ clearSelection(); hidePop(); closeDrawer(); st.armed = null; renderLib(); }
+  if (e.key === 'r' && selection.size){ transformSel('rot'); return; }
+  const keys = { p: 'pen', h: 'hl', e: 'eraser', l: 'lasso', t: 'text', s: 'sym', w: 'wire', ' ': 'hand' };
+  if (!mod && keys[e.key]) setTool(keys[e.key]);
+});
+
+/* ================= spolupráce (room) ================= */
+let presTimer = null, presPending = {};
+function pres(patch){
+  if (!named) return;
+  Object.assign(presPending, patch);
+  if (presTimer) return;
+  presTimer = setTimeout(() => {
+    presTimer = null; const p = presPending; presPending = {};
+    try { const r = named && named.presence(p); if (r && r.catch) r.catch(() => {}); } catch {}
+  }, window.TK_PWA ? 100 : 55);
+}
+async function joinRoom(pid){
+  const tok = ++roomToken;
+  if (unsubPeers){ try { unsubPeers(); } catch {} unsubPeers = null; }
+  if (named){ try { const r = named.leave(); if (r && r.catch) r.catch(() => {}); } catch {} named = null; }
+  peers = []; liveBufs.clear(); renderPeers();
+  if (!room) return;
+  try {
+    const nr = await room.join('p-' + pid);
+    if (tok !== roomToken){ try { nr.leave(); } catch {} return; }
+    named = nr;
+    unsubPeers = named.onPeers(ch => {
+      peers = ch.peers.filter(p => !p.sameTab && p.kind === 'viewer');
+      for (const p of peers) ingestLive(p);
+      for (const p of ch.left) liveBufs.delete(p.peer);
+      renderPeers(); requestDraw();
+    }, () => {});
+  } catch { named = null; }
+}
+function ingestLive(p){
+  const L = p.presence && p.presence.live;
+  if (!L || typeof L !== 'object'){ const b = liveBufs.get(p.peer); if (b && !b.ended){ b.ended = Date.now(); setTimeout(() => { if (liveBufs.get(p.peer) === b){ liveBufs.delete(p.peer); requestDraw(); } }, 2500); } return; }
+  if (typeof L.id !== 'string' || !Array.isArray(L.p) || !Number.isInteger(L.o) || L.o < 0 || L.o > 30000) return;
+  let b = liveBufs.get(p.peer);
+  if (!b || b.id !== L.id){ if (items.has(L.id)) return; b = { id: L.id, pts: [] }; liveBufs.set(p.peer, b); }
+  b.t = L.t === 'hl' ? 'hl' : 'pen'; b.c = L.c; b.w = clamp(+L.w || 2, 0.5, 60);
+  b.f = ['line', 'ar', 'poly', 'open'].includes(L.f) ? L.f : '';
+  if (b.f) b.pts = L.p.slice(0, 600);
+  else { for (let i = 0; i < L.p.length; i++) b.pts[L.o * 3 + i] = L.p[i]; for (let i = 0; i < b.pts.length; i++) if (b.pts[i] === undefined) b.pts[i] = b.pts[i - 3] ?? 0; }
+}
+const PEER_COLS = ['#1E5BD8','#D7263D','#13824A','#7A3FD1','#E07A10','#0E8C92','#B8336A'];
+function peerColor(p){ const s = p.by || p.peer; let h = 0; for (const ch of s) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return PEER_COLS[h % PEER_COLS.length]; }
+function peerLabel(p){ return (p.by && peerNames[p.by]) || (p.guest ? 'Host' : 'Spolupracovník'); }
+async function renderPeers(){
+  const box = $('#peers');
+  const ids = [...new Set(peers.map(p => p.by).filter(Boolean))].filter(id => !peerNames[id]);
+  if (userCap && ids.length){ try { const pr = await userCap.profiles(ids); for (const id of ids) if (pr[id] && pr[id].name) peerNames[id] = pr[id].name; } catch {} }
+  box.textContent = '';
+  const seen = new Set();
+  for (const p of peers){
+    const key = p.by || p.peer; if (seen.has(key)) continue; seen.add(key);
+    const d = document.createElement('div'); d.className = 'av'; d.style.background = peerColor(p);
+    const nm = peerLabel(p); d.textContent = nm.split(/\s+/).map(s => s[0] || '').join('').slice(0, 2).toUpperCase(); d.title = nm;
+    box.appendChild(d);
+    if (seen.size >= 5) break;
+  }
+}
+
+/* ================= sešity a stránky ================= */
+let rawPages = [], rawBooks = [], pagesLoaded = false, booksLoaded = false, creatingDefault = false, creatingFirst = false;
+const pendingPages = new Map(), pendingBooks = new Map();
+const DEF_BOOK = 'obecne';
+function onPagesRaw(list){ rawPages = list; pagesLoaded = true; recompute(); }
+function onBooksRaw(list){ rawBooks = list; booksLoaded = true; recompute(); }
+function recompute(){
+  if (!pagesLoaded || !booksLoaded) return;
+  let books = rawBooks.slice();
+  for (const [id, d] of pendingBooks){ if (books.some(b => b.id === id)) pendingBooks.delete(id); else books.push({ id, ...d }); }
+  const deadBooks = new Set(books.filter(b => b.deleted).map(b => b.id));
+  books = books.filter(b => b && !b.deleted && typeof b.title === 'string');
+  let pages = rawPages.slice();
+  for (const [id, d] of pendingPages){ if (pages.some(p => p.id === id)) pendingPages.delete(id); else pages.push({ id, ...d }); }
+  pages = pages.filter(p => p && !p.deleted && typeof p.title === 'string').map(p => ({ ...p, bid: typeof p.bid === 'string' ? p.bid : DEF_BOOK }));
+  const needDef = (pages.some(p => p.bid === DEF_BOOK) || !books.length) && !deadBooks.has(DEF_BOOK);
+  if (needDef && !books.some(b => b.id === DEF_BOOK)){
+    books.unshift({ id: DEF_BOOK, title: 'Obecné', createdAt: 0 });
+    if (!st.readOnly && !creatingDefault){ creatingDefault = true; store.set('books/' + DEF_BOOK, { title: 'Obecné', createdAt: 0 }).catch(() => { creatingDefault = false; }); }
+  }
+  books.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+  const live = new Set(books.map(b => b.id));
+  st.books = books;
+  st.pages = pages.filter(p => live.has(p.bid)).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+  if (!st.pages.length){
+    if (!st.readOnly && !creatingFirst && books.length){ creatingFirst = true; createPage(live.has(st.bid) ? st.bid : books[0].id, 'Stránka 1'); }
+    else if (st.readOnly){ $('#boot').classList.add('off'); toast('Zatím tu nejsou žádné stránky.'); }
+    renderDrawer(); return;
+  }
+  if (st.hash){
+    const h = st.hash; st.hash = null;
+    if (h.p && st.pages.some(p => p.id === h.p)) openPage(h.p, true);
+    else if (h.b && live.has(h.b)) openBook(h.b, true);
+    else toast('Sešit nebo stránka z odkazu neexistuje.');
+  }
+  if (!st.pid || !st.pages.some(p => p.id === st.pid)){
+    const last = LS.get('tk:last', null);
+    openPage(st.pages.some(p => p.id === last) ? last : st.pages[0].id, true);
+  }
+  const cur = st.pages.find(p => p.id === st.pid); if (cur) st.bid = cur.bid;
+  renderDrawer(); renderTitle();
+  $('#boot').classList.add('off');
+}
+function onWriteErrorPage(err){
+  const code = (err && err.code) || 'neznámá chyba';
+  if (code === 'invalid_argument' || code === 'revoked'){ setReadOnly(true); toast('Nemáš právo měnit sešity a stránky. Požádej vlastníka o roli Contributor.'); }
+  else toast('Změnu se nepodařilo uložit (' + code + '). Zkontroluj připojení.');
+}
+function createPage(bid, title){
+  const id = rid(8);
+  const data = { title, createdAt: Date.now(), by: st.uid || '', bid };
+  pendingPages.set(id, data);
+  recompute();
+  openPage(id, true);
+  store.set('pages/' + id, data).catch(err => { pendingPages.delete(id); onWriteErrorPage(err); if (st.pid === id) st.pid = null; recompute(); });
+  return id;
+}
+function nextName(prefix, list){ let n = list.length + 1; const names = new Set(list.map(p => p.title)); while (names.has(prefix + ' ' + n)) n++; return prefix + ' ' + n; }
+function addPage(){
+  if (st.readOnly){ toast('Máš jen právo ke čtení. Požádej vlastníka o roli Contributor.'); return; }
+  const bid = st.bid || DEF_BOOK;
+  createPage(bid, nextName('Stránka', st.pages.filter(p => p.bid === bid)));
+  toast('Stránka vytvořena – přejmenuješ ji v seznamu stránek');
+  st.drawerView = 'pages'; renderDrawer(); closeDrawer();
+}
+async function addBook(){
+  if (st.readOnly){ toast('Máš jen právo ke čtení.'); return; }
+  const t = await dialog({ title: 'Nový sešit', text: 'Například název předmětu.', input: '', ok: 'Vytvořit' });
+  if (t == null || !t.trim()) return;
+  const id = rid(8), data = { title: t.trim().slice(0, 60), createdAt: Date.now() };
+  pendingBooks.set(id, data);
+  store.set('books/' + id, data).catch(err => { pendingBooks.delete(id); onWriteErrorPage(err); recompute(); });
+  recompute();
+  st.bid = id; createPage(id, 'Stránka 1');
+  st.drawerView = 'pages'; renderDrawer(); closeDrawer();
+}
+function openBook(bid, quiet){
+  st.bid = bid;
+  const pages = st.pages.filter(p => p.bid === bid);
+  const last = LS.get('tk:lastp:' + bid, null);
+  if (pages.length) openPage(pages.some(p => p.id === last) ? last : pages[0].id, quiet);
+  else if (!st.readOnly) createPage(bid, 'Stránka 1');
+  st.drawerView = 'pages'; renderDrawer(); renderTitle();
+}
+function openPage(pid, quiet){
+  if (pid === st.pid){ if (!quiet) closeDrawer(); return; }
+  if (editing) commitText();
+  cancelAct();
+  for (const c of chunks.values()) if (c.dirty){ clearTimeout(c.timer); flush(c); }
+  if (unsubChunks){ try { unsubChunks(); } catch {} unsubChunks = null; }
+  items.clear(); hidden.clear(); undoStack.length = 0; redoStack.length = 0; updUndo();
+  selection = new Set(); updateSelBB();
+  st.pid = pid; LS.set('tk:last', pid);
+  const pg = st.pages.find(p => p.id === pid) || (pendingPages.has(pid) ? { bid: pendingPages.get(pid).bid } : null);
+  if (pg){ st.bid = pg.bid; LS.set('tk:lastp:' + pg.bid, pid); }
+  const vp = LS.get('tk:vp:' + pid, null);
+  if (vp && [vp.x, vp.y, vp.z].every(Number.isFinite)) setCam(vp.x, vp.y, vp.z); else setCam(-60, -90, 1);
+  unsubChunks = store.watchChunks(pid, docs => { if (st.pid !== pid) return; for (const d of docs) if (d && Array.isArray(d.items)) ingest(d.items); }, err => {
+    if (err && err.code === 'revoked') setReadOnly(true);
+    else setTimeout(() => { if (st.pid === pid){ unsubChunks = null; st.pid = null; openPage(pid, true); } }, 2000);
+  });
+  try { history.replaceState(null, '', '#p=' + encodeURIComponent(pid)); } catch {}
+  joinRoom(pid);
+  staticDirty = true; requestDraw(); renderDrawer(); renderTitle(); refreshSync();
+  if (!quiet) closeDrawer();
+}
+const pageTitle = pid => { const p = st.pages.find(x => x.id === pid); return p ? p.title : ''; };
+const bookTitle = bid => { const b = st.books.find(x => x.id === bid); return b ? b.title : ''; };
+function renderTitle(){
+  $('#tBook').textContent = st.books.length > 1 || st.bid !== DEF_BOOK ? bookTitle(st.bid) : '';
+  $('#tPage').textContent = pageTitle(st.pid) || '…';
+  document.title = (pageTitle(st.pid) || 'Stránka') + ' – Tečkovník';
+}
+const ICON = {
+  link: '<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>',
+  edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+  del: '<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>',
+  move: '<path d="M4 7h11l-3-3M20 17H9l3 3"/>'
+};
+function renderDrawer(){
+  const head = $('#drHead'), box = $('#pageList'); head.textContent = ''; box.textContent = '';
+  if (st.drawerView === 'books'){
+    const h = document.createElement('h2'); h.textContent = 'Sešity'; head.appendChild(h);
+    for (const b of st.books){
+      const row = document.createElement('div'); row.className = 'pg' + (b.id === st.bid ? ' cur' : '');
+      const nm = document.createElement('button'); nm.className = 'nm'; nm.textContent = b.title || 'Bez názvu'; nm.onclick = () => openBook(b.id);
+      const cnt = document.createElement('span'); cnt.className = 'cnt'; const n = st.pages.filter(p => p.bid === b.id).length;
+      cnt.textContent = n + (n === 1 ? ' str.' : ' str.');
+      row.append(nm, cnt, iconBtn('Kopírovat odkaz na sešit', ICON.link, () => copyLink('b', b.id)));
+      if (!st.readOnly){ row.append(iconBtn('Přejmenovat sešit', ICON.edit, () => renameBook(b.id)), iconBtn('Smazat sešit', ICON.del, () => deleteBook(b.id))); }
+      box.appendChild(row);
+    }
+    $('#addLbl').textContent = 'Nový sešit';
+  } else {
+    const back = document.createElement('button'); back.id = 'drBack';
+    back.innerHTML = '<svg class="i" viewBox="0 0 24 24" style="width:20px;height:20px"><path d="m15 18-6-6 6-6"/></svg>Sešity';
+    back.onclick = () => { st.drawerView = 'books'; renderDrawer(); };
+    const h = document.createElement('h2'); h.textContent = bookTitle(st.bid) || 'Stránky';
+    head.append(back, h, iconBtn('Kopírovat odkaz na sešit', ICON.link, () => copyLink('b', st.bid)));
+    for (const p of st.pages.filter(p => p.bid === st.bid)){
+      const row = document.createElement('div'); row.className = 'pg' + (p.id === st.pid ? ' cur' : '');
+      const nm = document.createElement('button'); nm.className = 'nm'; nm.textContent = p.title || 'Bez názvu'; nm.onclick = () => openPage(p.id);
+      row.append(nm, iconBtn('Kopírovat odkaz na stránku', ICON.link, () => copyLink('p', p.id)));
+      if (!st.readOnly){
+        row.append(iconBtn('Přejmenovat stránku', ICON.edit, () => renamePage(p.id)));
+        if (st.books.length > 1) row.append(iconBtn('Přesunout do jiného sešitu', ICON.move, () => movePage(p.id)));
+        row.append(iconBtn('Smazat stránku', ICON.del, () => deletePage(p.id)));
+      }
+      box.appendChild(row);
+    }
+    $('#addLbl').textContent = 'Nová stránka';
+  }
+  $('#addPage').style.display = st.readOnly ? 'none' : '';
+}
+function iconBtn(label, svg, fn){
+  const b = document.createElement('button'); b.className = 'ib'; b.setAttribute('aria-label', label); b.title = label;
+  b.innerHTML = '<svg class="i" viewBox="0 0 24 24">' + svg + '</svg>'; b.onclick = fn; return b;
+}
+async function renamePage(pid){
+  const t = await dialog({ title: 'Přejmenovat stránku', input: pageTitle(pid), ok: 'Uložit' });
+  if (t == null || !t.trim()) return;
+  store.update('pages/' + pid, { title: t.trim().slice(0, 80) }).catch(onWriteErrorPage);
+}
+async function deletePage(pid){
+  const ok = await dialog({ title: 'Smazat stránku?', text: '„' + pageTitle(pid) + '“ zmizí všem, kdo ji mají otevřenou.', ok: 'Smazat', danger: true });
+  if (ok) store.update('pages/' + pid, { deleted: true }).catch(onWriteErrorPage);
+}
+async function movePage(pid){
+  const p = st.pages.find(x => x.id === pid); if (!p) return;
+  const to = await dialog({ title: 'Přesunout „' + p.title + '“ do sešitu', choices: st.books.map(b => ({ label: b.title, value: b.id, current: b.id === p.bid })) });
+  if (!to || to === p.bid) return;
+  store.update('pages/' + pid, { bid: to }).then(() => { if (st.pid === pid){ st.bid = to; renderDrawer(); renderTitle(); } }).catch(onWriteErrorPage);
+  toast('Stránka přesunuta do sešitu „' + bookTitle(to) + '“');
+}
+async function renameBook(bid){
+  const t = await dialog({ title: 'Přejmenovat sešit', input: bookTitle(bid), ok: 'Uložit' });
+  if (t == null || !t.trim()) return;
+  const ex = rawBooks.find(b => b.id === bid);
+  store.set('books/' + bid, { title: t.trim().slice(0, 60), createdAt: (ex && ex.createdAt) || 0 }).catch(onWriteErrorPage);
+}
+async function deleteBook(bid){
+  const n = st.pages.filter(p => p.bid === bid).length;
+  const ok = await dialog({ title: 'Smazat sešit?', text: '„' + bookTitle(bid) + '“ včetně ' + n + ' stránek zmizí všem.', ok: 'Smazat', danger: true });
+  if (!ok) return;
+  if (bid === st.bid){ st.pid = null; }
+  store.set('books/' + bid, { title: bookTitle(bid), createdAt: 0, deleted: true }).catch(onWriteErrorPage);
+}
+function linkUrl(kind, id){ return (BASE_URL || location.href.split('#')[0]) + '#' + kind + '=' + encodeURIComponent(id); }
+async function copyLink(kind, id){
+  const url = linkUrl(kind, id), name = kind === 'p' ? 'stránku „' + pageTitle(id) + '“' : 'sešit „' + bookTitle(id) + '“';
+  try { await navigator.clipboard.writeText(url); toast('Odkaz na ' + name + ' zkopírován'); }
+  catch { await dialog({ title: 'Odkaz na ' + name, text: 'Zkopíruj odkaz ručně:', input: url, ok: 'Hotovo', noCancel: true, select: true }); }
+}
+function readHash(){
+  const p = /[#&]p=([^&]+)/.exec(location.hash), b = /[#&]b=([^&]+)/.exec(location.hash);
+  if (!p && !b) return null;
+  return { p: p ? decodeURIComponent(p[1]) : null, b: b ? decodeURIComponent(b[1]) : null };
+}
+window.addEventListener('hashchange', () => { const h = readHash(); if (h && h.p !== st.pid){ st.hash = h; recompute(); } });
+function setReadOnly(v){
+  st.readOnly = v; if (v){ cancelAct(); setTool('hand'); }
+  document.querySelectorAll('.tool').forEach(b => { if (b.dataset.tool !== 'hand') b.disabled = v; });
+  $('#newSym').style.display = v ? 'none' : '';
+  updUndo(); renderDrawer(); refreshSync(); updateSelBB();
+}
+
+/* ================= knihovna – panel ================= */
+function symList(){
+  return [...BUILTIN, ...[...symMap.values()].filter(d => !d.deleted).sort((a, b) => a.name.localeCompare(b.name, 'cs'))];
+}
+function drawThumb(cnv, def){
+  const dpr = Math.min(window.devicePixelRatio || 1, 2.5), cw = 84, ch = 52;
+  cnv.width = cw * dpr; cnv.height = ch * dpr;
+  const c = cnv.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, cw, ch);
+  const s = Math.min((cw - 10) / def.w, (ch - 8) / def.h, 0.9);
+  c.translate((cw - def.w * s) / 2, (ch - def.h * s) / 2); c.scale(s, s);
+  drawPrims(c, def.prims, T.text, true, Math.max(1.6, 1.2 / s));
+}
+function renderLib(){
+  const box = $('#libList'); if (!box) return; box.textContent = '';
+  const list = symList();
+  for (const cat of CATS){
+    const defs = list.filter(d => d.cat === cat);
+    if (!defs.length && cat !== 'Vlastní') continue;
+    const h = document.createElement('h4'); h.textContent = cat; box.appendChild(h);
+    const grid = document.createElement('div'); grid.className = 'tiles';
+    if (!defs.length){ const p = document.createElement('p'); p.style.cssText = 'font-size:13px;color:var(--muted);margin:0 2px'; p.textContent = 'Zatím žádné. Vytvoř první tlačítkem dole.'; box.appendChild(p); continue; }
+    for (const d of defs){
+      const t = document.createElement('button'); t.className = 'tile'; t.setAttribute('aria-pressed', String(st.armed === d.id)); t.title = d.name;
+      const cnv = document.createElement('canvas'); drawThumb(cnv, d);
+      const sp = document.createElement('span'); sp.textContent = d.name;
+      t.append(cnv, sp);
+      t.onclick = () => armSymbol(d.id);
+      if (!d.builtin && !st.readOnly){
+        const ed = document.createElement('span'); ed.className = 'ed'; ed.setAttribute('role', 'button'); ed.setAttribute('aria-label', 'Upravit značku ' + d.name);
+        ed.innerHTML = '<svg class="i" viewBox="0 0 24 24">' + ICON.edit + '</svg>';
+        ed.onclick = ev => { ev.stopPropagation(); openEditor(d); };
+        t.appendChild(ed);
+      }
+      grid.appendChild(t);
+    }
+    box.appendChild(grid);
+  }
+}
+function armSymbol(id){
+  st.armed = st.armed === id ? null : id;
+  if (st.tool !== 'sym') setTool('sym', true);
+  renderLib();
+  if (st.armed){ toast('Klepni do plochy – „' + getDef(id).name + '“ se vloží na tečky'); if (W < 700) closeLib(); }
+}
+function openLib(){ hidePop(); renderLib(); $('#lib').classList.add('on'); }
+function closeLib(){ $('#lib').classList.remove('on'); }
+$('#libClose').onclick = closeLib;
+$('#newSym').onclick = () => openEditor(null);
+
+/* ================= editor vlastní značky ================= */
+const ED = { open: false, def: null, prims: [], pins: [], hist: [], tool: 'pen', s: 1, act: null, pen: 0 };
+const EN = 12, EH = G / 2;
+const sedCv = $('#sedCv'), ectx = sedCv.getContext('2d');
+const snE = (v, s) => clamp(Math.round(v / s) * s, 0, EN * G);
+const HINTS = {
+  pen: 'Kresli volně. Čáry, kruhy, obdélníky a trojúhelníky se po zvednutí pera samy narovnají na tečky.',
+  line: 'Táhni od tečky k tečce – rovná čára.',
+  rect: 'Táhni z rohu do protilehlého rohu.',
+  circle: 'Táhni ze středu ven – poloměr se přichytí.',
+  pin: 'Klepni na velkou tečku – tam se bude připojovat vodič. Dalším klepnutím vývod zrušíš.',
+  fill: 'Klepni dovnitř uzavřeného tvaru – vyplní se (nebo vyplnění zruší).',
+  eraser: 'Přejeď přes čáru nebo vývod, který chceš smazat.'
+};
+function openEditor(def){
+  if (st.readOnly){ toast('Máš jen právo ke čtení.'); return; }
+  ED.def = def; ED.hist = []; ED.act = null;
+  if (def){
+    const ox = Math.round((EN * G - def.w) / 2 / G) * G, oy = Math.round((EN * G - def.h) / 2 / G) * G;
+    ED.prims = def.prims.map(pr => pr.tx != null ? { ...pr, x: pr.x + ox, y: pr.y + oy } : { ...pr, p: pr.p.map((v, i) => v + (i % 2 ? oy : ox)) });
+    ED.pins = def.pins.map(([x, y]) => [x + ox, y + oy]);
+  } else { ED.prims = []; ED.pins = []; }
+  $('#sedName').value = def ? def.name : '';
+  const sel = $('#sedCat'); sel.textContent = '';
+  for (const c of CATS){ const o = document.createElement('option'); o.value = c; o.textContent = c; sel.appendChild(o); }
+  sel.value = def ? def.cat : 'Vlastní';
+  $('#sedDel').style.display = def ? '' : 'none';
+  ED.open = true; $('#sed').classList.add('on');
+  setETool('pen'); sizeEditor(); drawEd();
+}
+function closeEditor(){ ED.open = false; $('#sed').classList.remove('on'); }
+function setETool(t){ ED.tool = t; document.querySelectorAll('#sedTools [data-et]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.et === t))); $('#sedHint').textContent = HINTS[t] || ''; }
+document.querySelectorAll('#sedTools [data-et]').forEach(b => b.onclick = () => setETool(b.dataset.et));
+function sizeEditor(){
+  const head = $('#sedHead').getBoundingClientRect().height + $('#sedTools').getBoundingClientRect().height + 80;
+  const size = clamp(Math.min(window.innerWidth - 32, window.innerHeight - head - 40), 220, 760);
+  sedCv.style.width = sedCv.style.height = size + 'px';
+  sedCv.width = sedCv.height = Math.round(size * DPR);
+  ED.s = size / (EN * G);
+}
+function edPt(e){ const r = sedCv.getBoundingClientRect(); return [(e.clientX - r.left) / ED.s, (e.clientY - r.top) / ED.s]; }
+function pushHist(){ ED.hist.push(JSON.stringify({ prims: ED.prims, pins: ED.pins })); if (ED.hist.length > 80) ED.hist.shift(); }
+$('#sedUndo').onclick = () => { const h = ED.hist.pop(); if (!h) return; const o = JSON.parse(h); ED.prims = o.prims; ED.pins = o.pins; drawEd(); };
+$('#sedClear').onclick = () => { if (!ED.prims.length && !ED.pins.length) return; pushHist(); ED.prims = []; ED.pins = []; drawEd(); };
+function circlePrim(cx, cy, r){ const p = []; for (let i = 0; i < 48; i++){ const t = i / 48 * Math.PI * 2; p.push(q(cx + Math.cos(t) * r), q(cy + Math.sin(t) * r)); } return { p, cl: 1, f: 0 }; }
+function edPreview(){
+  const a = ED.act; if (!a) return null;
+  if (a.type === 'pen') return { p: a.pts.flat(), sm: 1 };
+  if (a.type === 'line') return { p: [...a.a, ...a.b] };
+  if (a.type === 'rect'){ const [x0, y0] = a.a, [x1, y1] = a.b; return { p: [x0, y0, x1, y0, x1, y1, x0, y1], cl: 1 }; }
+  if (a.type === 'circle'){ const r = Math.max(G / 4, snE(Math.hypot(a.b[0] - a.a[0], a.b[1] - a.a[1]), G / 4)); return circlePrim(a.a[0], a.a[1], r); }
+  return null;
+}
+function drawEd(){
+  const c = ectx, D = DPR, s = ED.s;
+  c.setTransform(1, 0, 0, 1, 0, 0); c.fillStyle = T.paper; c.fillRect(0, 0, sedCv.width, sedCv.height);
+  c.setTransform(D * s, 0, 0, D * s, 0, 0);
+  c.fillStyle = T.dot;
+  for (let x = 0; x <= EN * G; x += EH) for (let y = 0; y <= EN * G; y += EH){
+    const major = x % G === 0 && y % G === 0, r = (major ? 1.8 : 0.9) / s;
+    c.fillRect(x - r, y - r, 2 * r, 2 * r);
+  }
+  const all = ED.prims.slice(); const pv = edPreview(); if (pv) all.push(pv);
+  drawPrims(c, all, T.ink, true, WIRE_W);
+  for (const [x, y] of ED.pins){
+    c.fillStyle = T.accent; c.beginPath(); c.arc(x, y, 4.2, 0, Math.PI * 2); c.fill();
+    c.strokeStyle = T.paper; c.lineWidth = 1.4; c.beginPath(); c.arc(x, y, 1.8, 0, Math.PI * 2); c.stroke();
+  }
+  if (ED.act && ED.act.type === 'eraser'){ c.strokeStyle = T.accent; c.lineWidth = 1 / s; c.beginPath(); c.arc(ED.act.x, ED.act.y, 8 / s, 0, Math.PI * 2); c.stroke(); }
+}
+sedCv.addEventListener('pointerdown', e => {
+  if (e.pointerType === 'pen') ED.pen = Date.now();
+  if (e.pointerType === 'touch' && Date.now() - ED.pen < 3000) return;
+  if (ED.act) return;
+  sedCv.setPointerCapture(e.pointerId);
+  const [x, y] = edPt(e), t = ED.tool;
+  if (t === 'pen'){ ED.act = { type: 'pen', id: e.pointerId, pts: [[q(x), q(y)]] }; }
+  else if (t === 'line' || t === 'rect'){ const a = [snE(x, EH), snE(y, EH)]; ED.act = { type: t, id: e.pointerId, a, b: a }; }
+  else if (t === 'circle'){ const a = [snE(x, EH), snE(y, EH)]; ED.act = { type: 'circle', id: e.pointerId, a, b: a }; }
+  else if (t === 'eraser'){ pushHist(); ED.act = { type: 'eraser', id: e.pointerId, x, y, any: false }; edErase(x, y); }
+  else if (t === 'pin'){
+    const p = [snE(x, G), snE(y, G)]; pushHist();
+    const i = ED.pins.findIndex(v => v[0] === p[0] && v[1] === p[1]);
+    if (i >= 0) ED.pins.splice(i, 1); else ED.pins.push(p);
+  } else if (t === 'fill'){
+    for (let i = ED.prims.length - 1; i >= 0; i--){ const pr = ED.prims[i]; if (pr.cl && pr.p && inPoly(x, y, pr.p)){ pushHist(); ED.prims[i] = { ...pr, f: pr.f ? 0 : 1 }; break; } }
+  }
+  drawEd();
+});
+sedCv.addEventListener('pointermove', e => {
+  const a = ED.act; if (!a || a.id !== e.pointerId) return;
+  const [x, y] = edPt(e);
+  if (a.type === 'pen'){ const l = a.pts[a.pts.length - 1]; if (Math.hypot(x - l[0], y - l[1]) * ED.s > 1.5) a.pts.push([q(x), q(y)]); }
+  else if (a.type === 'line' || a.type === 'rect' || a.type === 'circle') a.b = [snE(x, EH), snE(y, EH)];
+  else if (a.type === 'eraser'){ a.x = x; a.y = y; edErase(x, y); }
+  drawEd();
+});
+const edEnd = e => {
+  const a = ED.act; if (!a || a.id !== e.pointerId) return; ED.act = null;
+  if (a.type === 'pen'){
+    let prim = null;
+    if (a.pts.length >= 4){
+      const r = recognize(flat3(a.pts), ED.s, EH);
+      if (r){
+        if (r.kind === 'line'){ const l = a.pts[a.pts.length - 1]; prim = { p: [r.ax, r.ay, snE(l[0], EH), snE(l[1], EH)] }; }
+        else if (r.kind === 'arrow') prim = { p: pairs3(r.p).flat(), ar: 1 };
+        else prim = { p: pairs3(r.p).flat(), cl: 1, f: 0 };
+      }
+    }
+    if (!prim) prim = a.pts.length > 1 ? { p: a.pts.flat(), sm: 1 } : { p: [a.pts[0][0], a.pts[0][1], a.pts[0][0] + 0.5, a.pts[0][1]] };
+    pushHist(); ED.prims.push(prim);
+  } else if (a.type === 'line' || a.type === 'rect' || a.type === 'circle'){
+    if (a.a[0] !== a.b[0] || a.a[1] !== a.b[1]){ ED.act = a; const pr = edPreview(); ED.act = null; if (pr){ pushHist(); ED.prims.push(pr); } }
+  } else if (a.type === 'eraser' && !a.any) ED.hist.pop();
+  drawEd();
+};
+sedCv.addEventListener('pointerup', edEnd);
+sedCv.addEventListener('pointercancel', e => { ED.act = null; drawEd(); });
+sedCv.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
+function edErase(x, y){
+  const tol = 8 / ED.s + 2;
+  const before = ED.prims.length + ED.pins.length;
+  ED.prims = ED.prims.filter(pr => {
+    if (pr.tx != null){ const b = primBB(pr); return !(x >= b[0] - tol && x <= b[2] + tol && y >= b[1] - tol && y <= b[3] + tol); }
+    const p = pr.p, n = p.length / 2;
+    for (let i = 0; i < n - 1; i++) if (segDist(x, y, p[i*2], p[i*2+1], p[i*2+2], p[i*2+3]) <= tol) return false;
+    if (pr.cl && n > 2 && segDist(x, y, p[(n-1)*2], p[(n-1)*2+1], p[0], p[1]) <= tol) return false;
+    if (pr.cl && pr.f && inPoly(x, y, p)) return false;
+    return true;
+  });
+  ED.pins = ED.pins.filter(([px, py]) => Math.hypot(px - x, py - y) > tol);
+  if (ED.prims.length + ED.pins.length !== before) ED.act.any = true;
+}
+$('#sedCancel').onclick = closeEditor;
+$('#sedSave').onclick = async () => {
+  const name = $('#sedName').value.trim();
+  if (!name){ toast('Zadej název značky'); $('#sedName').focus(); return; }
+  if (!ED.prims.length){ toast('Značka je prázdná – nakresli ji do teček'); return; }
+  const n = normalizeDef(ED.prims, ED.pins);
+  const docId = ED.def ? ED.def.docId : rid(10);
+  const data = { name: name.slice(0, 40), cat: $('#sedCat').value, prims: n.prims, pins: n.pins, w: n.w, h: n.h, by: st.uid || '', createdAt: ED.def ? ED.def.createdAt : Date.now(), updatedAt: Date.now() };
+  if (JSON.stringify(data).length > 200000){ toast('Značka je příliš složitá – zjednoduš kresbu.'); return; }
+  try { await store.set('symbols/' + docId, data); }
+  catch (err){ onWriteErrorPage(err); return; }
+  if (!n.pins.length) toast('Uloženo bez vývodů – vodiče se k ní nebudou přichytávat.');
+  else toast('Značka „' + data.name + '“ uložena do sdílené knihovny');
+  closeEditor(); st.armed = 'c:' + docId; if (st.tool !== 'sym') setTool('sym', true); renderLib();
+};
+$('#sedDel').onclick = async () => {
+  if (!ED.def) return;
+  const ok = await dialog({ title: 'Smazat značku z knihovny?', text: 'Už vložené značky na stránkách zůstanou.', ok: 'Smazat', danger: true });
+  if (!ok) return;
+  store.set('symbols/' + ED.def.docId, { name: ED.def.name, cat: ED.def.cat, prims: ED.def.prims, pins: ED.def.pins, w: ED.def.w, h: ED.def.h, createdAt: ED.def.createdAt, deleted: true }).catch(onWriteErrorPage);
+  if (st.armed === ED.def.id) st.armed = null;
+  closeEditor();
+};
+
+/* ================= UI ================= */
+function setTool(t, keepLib){
+  if (st.readOnly && t !== 'hand') return;
+  if (editing) commitText();
+  const prev = st.tool;
+  st.tool = t; if (t !== 'lasso' && t !== 'sym') clearSelection();
+  document.querySelectorAll('.tool').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.tool === t)));
+  buildSwatches();
+  cv.style.cursor = t === 'hand' ? 'grab' : t === 'text' ? 'text' : 'crosshair';
+  if (t === 'sym'){ if (!keepLib && prev !== 'sym') openLib(); else if (!keepLib) ($('#lib').classList.contains('on') ? closeLib() : openLib()); }
+  else { closeLib(); }
+  if (t === 'wire' && prev !== 'wire') toast('Vodič: táhni od tečky nebo vývodu značky – vede se pravoúhle');
+  requestDraw();
+}
+document.querySelectorAll('.tool').forEach(b => b.onclick = () => setTool(b.dataset.tool));
+function buildSwatches(){
+  const box = $('#colors'), wbox = $('#widths'); box.textContent = ''; wbox.textContent = '';
+  const isHl = st.tool === 'hl', showColor = ['pen', 'hl', 'text', 'wire', 'sym'].includes(st.tool);
+  box.style.display = showColor ? 'flex' : 'none'; $('#wsep').style.display = (st.tool === 'pen' || isHl) ? '' : 'none';
+  if (showColor){
+    for (const c of isHl ? HL_COLORS : PEN_COLORS){
+      const b = document.createElement('button'); b.className = 'sw'; b.setAttribute('aria-label', 'Barva');
+      const s = document.createElement('span'); s.style.background = colorOf(c); b.appendChild(s);
+      b.setAttribute('aria-pressed', String((isHl ? st.hlColor : st.penColor) === c));
+      b.onclick = () => { if (isHl) st.hlColor = c; else st.penColor = c; buildSwatches(); };
+      box.appendChild(b);
+    }
+  }
+  if (st.tool === 'pen' || isHl){
+    [7, 11, 16].forEach((px, i) => {
+      const b = document.createElement('button'); b.className = 'wd'; b.setAttribute('aria-label', ['Tenká', 'Střední', 'Silná'][i] + ' čára');
+      const s = document.createElement('span'); s.style.width = s.style.height = (isHl ? px + 2 : px - 2) + 'px'; b.appendChild(s);
+      b.setAttribute('aria-pressed', String((isHl ? st.hlW : st.penW) === i));
+      b.onclick = () => { if (isHl) st.hlW = i; else st.penW = i; buildSwatches(); };
+      wbox.appendChild(b);
+    });
+  }
+  const sb = $('#selColors'); sb.textContent = '';
+  for (const c of PEN_COLORS){
+    const b = document.createElement('button'); b.className = 'sw'; b.setAttribute('aria-label', 'Změnit barvu výběru');
+    const s = document.createElement('span'); s.style.background = colorOf(c); b.appendChild(s);
+    b.onclick = () => { const out = []; for (const id of selection){ const e = items.get(id); if (e && e.k !== 'd' && e.k !== 'i' && e.t !== 'hl') out.push({ ...e, v: nv(), c }); } commitOp(out); };
+    sb.appendChild(b);
+  }
+}
+$('#undoBtn').onclick = undo; $('#redoBtn').onclick = redo;
+$('#zoomBtn').onclick = () => zoomAt(W / 2, H / 2, 1);
+$('#fitBtn').onclick = fitAll;
+$('#linkBtn').onclick = () => st.pid && copyLink('p', st.pid);
+$('#titleBtn').onclick = () => { st.drawerView = 'pages'; renderDrawer(); openDrawer(); };
+$('#menuBtn').onclick = () => { renderDrawer(); openDrawer(); };
+$('#scrim').onclick = closeDrawer;
+$('#addPage').onclick = () => st.drawerView === 'books' ? addBook() : addPage();
+function openDrawer(){ hidePop(); $('#drawer').classList.add('on'); $('#scrim').classList.add('on'); }
+function closeDrawer(){ $('#drawer').classList.remove('on'); $('#scrim').classList.remove('on'); }
+$('#setBtn').onclick = e => { e.stopPropagation(); closeLib(); $('#pop').classList.toggle('on'); };
+function hidePop(){ $('#pop').classList.remove('on'); }
+const tgF = $('#tgFinger'), tgS = $('#tgSnap');
+function syncToggles(){ tgF.setAttribute('aria-checked', String(st.finger)); tgS.setAttribute('aria-checked', String(st.snap)); }
+tgF.onclick = () => { st.finger = !st.finger; LS.set('tk:finger', st.finger); syncToggles(); };
+tgS.onclick = () => { st.snap = !st.snap; LS.set('tk:snap', st.snap); syncToggles(); };
+document.querySelectorAll('#themeSeg button').forEach(b => b.onclick = () => { st.theme = b.dataset.t; LS.set('tk:theme', st.theme); applyTheme(); });
+
+let toastT = null;
+function toast(msg){ const t = $('#toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 2800); }
+function dialog({ title, text, input, ok = 'OK', danger, noCancel, select, choices }){
+  return new Promise(res => {
+    const d = $('#dlg'), inp = $('#dlgIn'), ch = $('#dlgCh');
+    $('#dlgT').textContent = title; $('#dlgP').textContent = text || ''; $('#dlgP').style.display = text ? '' : 'none';
+    inp.style.display = input != null ? '' : 'none'; inp.value = input || '';
+    const okB = $('#dlgOk'), noB = $('#dlgNo');
+    okB.textContent = ok; okB.className = 'btn ' + (danger ? 'danger' : 'pri'); noB.style.display = noCancel ? 'none' : '';
+    okB.style.display = choices ? 'none' : '';
+    ch.textContent = ''; ch.style.display = choices ? '' : 'none';
+    const done = v => { d.classList.remove('on'); okB.onclick = noB.onclick = inp.onkeydown = null; res(v); };
+    for (const c of choices || []){ const b = document.createElement('button'); b.textContent = c.label; if (c.current) b.setAttribute('aria-current', 'true'); b.onclick = () => done(c.value); ch.appendChild(b); }
+    d.classList.add('on');
+    if (input != null) setTimeout(() => { inp.focus(); if (select) inp.select(); }, 30);
+    okB.onclick = () => done(input != null ? inp.value : true);
+    noB.onclick = () => done(null);
+    inp.onkeydown = e => { if (e.key === 'Enter') okB.click(); if (e.key === 'Escape') noB.click(); };
+  });
+}
+
+/* ================= obrázky, PDF, vektorizace ================= */
+let imgApi = null, sampleCap = null;
+const imgCache = new Map();
+const frame = () => new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
+function getImg(ref){
+  let o = imgCache.get(ref);
+  if (!o){
+    o = { img: null, state: 'loading' }; imgCache.set(ref, o);
+    (imgApi ? Promise.resolve(imgApi.src(ref)) : Promise.reject(new Error('no api'))).then(url => {
+      const im = new Image();
+      im.onload = () => { o.img = im; o.state = 'ok'; staticDirty = true; requestDraw(); };
+      im.onerror = () => { o.state = 'err'; staticDirty = true; requestDraw(); };
+      im.src = url;
+    }).catch(() => { o.state = 'err'; staticDirty = true; requestDraw(); });
+  }
+  return o;
+}
+function drawImageItem(c2, e, alpha){
+  const o = getImg(e.ref);
+  c2.save(); if (alpha) c2.globalAlpha = alpha;
+  if (o.img) c2.drawImage(o.img, e.x, e.y, e.w, e.h);
+  else {
+    c2.fillStyle = T.dark ? 'rgba(255,255,255,.04)' : 'rgba(0,0,0,.035)'; c2.fillRect(e.x, e.y, e.w, e.h);
+    c2.setLineDash([6, 5]); c2.strokeStyle = T.dot; c2.lineWidth = 1.5; c2.strokeRect(e.x, e.y, e.w, e.h);
+    c2.fillStyle = T.dot; c2.font = '500 14px Barlow, system-ui, sans-serif'; c2.textBaseline = 'middle'; c2.textAlign = 'center';
+    c2.fillText(o.state === 'err' ? 'Obrázek nelze načíst' : 'Načítám obrázek…', e.x + e.w / 2, e.y + e.h / 2);
+  }
+  c2.restore();
+}
+function singleImage(){
+  if (selection.size !== 1) return null;
+  const e = items.get(selection.values().next().value);
+  return e && e.k === 'i' ? e : null;
+}
+const isFree = e => e && e.k === 's' && e.t !== 'hl' && !isShape(e) && !e.wi;
+function selectIds(ids){ selection = new Set(ids); updateSelBB(); requestDraw(); }
+const viewCenter = () => [st.cam.x + W / 2 / st.cam.z, st.cam.y + H / 2 / st.cam.z];
+
+/* --- vstupy pro vložení --- */
+function openIns(){ hidePop(); closeLib(); $('#ins').classList.toggle('on'); }
+function closeIns(){ $('#ins').classList.remove('on'); }
+$('#insBtn').onclick = e => { e.stopPropagation(); if (!canEdit()){ toast('Máš jen právo ke čtení.'); return; } openIns(); };
+document.querySelectorAll('#ins [data-ins]').forEach(b => b.onclick = () => {
+  closeIns();
+  const k = b.dataset.ins;
+  if (k === 'img') $('#fImg').click(); else if (k === 'cam') $('#fCam').click(); else if (k === 'pdf') $('#fPdf').click(); else pasteClipboard();
+});
+for (const id of ['#fImg', '#fCam', '#fPdf']){
+  const inp = $(id);
+  inp.onchange = () => { const f = inp.files && inp.files[0]; inp.value = ''; if (f) handleBlob(f, f.name); };
+}
+cv.addEventListener('pointerdown', closeIns);
+document.addEventListener('paste', e => {
+  if (ED.open || editing || /INPUT|TEXTAREA/.test((e.target && e.target.tagName) || '')) return;
+  const f = [...((e.clipboardData && e.clipboardData.files) || [])].find(f => f.type.startsWith('image/') || f.type === 'application/pdf');
+  if (f){ e.preventDefault(); handleBlob(f, f.name); }
+});
+async function pasteClipboard(){
+  try {
+    const list = await navigator.clipboard.read();
+    for (const it of list){
+      const t = it.types.find(t => t.startsWith('image/'));
+      if (t) return handleBlob(await it.getType(t), 'schranka');
+    }
+    toast('Ve schránce není obrázek.');
+  } catch {
+    toast('Schránku tady nejde přečíst. Ve Freeformu dej Sdílet → Uložit obrázek a vlož ho přes „Fotka nebo obrázek“.');
+  }
+}
+async function handleBlob(blob, name){
+  if (!canEdit()){ toast('Máš jen právo ke čtení.'); return; }
+  const isPdf = blob.type === 'application/pdf' || /\.pdf$/i.test(name || '');
+  const choices = [{ label: 'Převést na tahy (upravitelné)', value: 'trace' }];
+  if (imgApi && imgApi.upload) choices.unshift({ label: isPdf ? 'Vložit stránky jako obrázky' : 'Vložit jako obrázek', value: 'img' });
+  const mode = await dialog({ title: isPdf ? 'Vložit PDF' : 'Vložit obrázek', text: 'Tahy jdou posouvat, mazat gumou, přebarvit a srovnat. Obrázek zůstane, jak je – hodí se pro fotky a zadání.', choices });
+  if (!mode) return;
+  try {
+    if (isPdf) await importPdf(blob, mode); else await importImage(blob, mode);
+  } catch (e){
+    console.error(e);
+    toast('Vložení se nepovedlo: ' + ((e && (e.message || e.code)) || e));
+  }
+}
+
+/* --- obrázky --- */
+async function fileToCanvas(blob, max){
+  let src;
+  try { src = await createImageBitmap(blob); }
+  catch {
+    src = await new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error('Obrázek nejde přečíst')); im.src = URL.createObjectURL(blob); });
+  }
+  const w0 = src.width, h0 = src.height, s = Math.min(1, max / Math.max(w0, h0));
+  const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(w0 * s)); c.height = Math.max(1, Math.round(h0 * s));
+  c.getContext('2d').drawImage(src, 0, 0, c.width, c.height);
+  return c;
+}
+function canvasHasAlpha(c){ const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; for (let i = 3; i < d.length; i += 4 * 7) if (d[i] < 250) return true; return false; }
+function canvasBlob(c){ const a = canvasHasAlpha(c); return new Promise((res, rej) => c.toBlob(b => b ? res(b) : rej(new Error('Kódování obrázku selhalo')), a ? 'image/png' : 'image/jpeg', 0.86)); }
+async function uploadCanvas(c, worldW, x, y){
+  const blob = await canvasBlob(c);
+  let ref;
+  try { ref = await imgApi.upload(blob); }
+  catch (e){ throw new Error(e && e.code === 'quota_exceeded' ? 'úložiště obrázků je plné' : 'obrázek se nepodařilo nahrát (' + ((e && (e.code || e.message)) || 'chyba') + ')'); }
+  return { id: rid(), v: nv(), k: 'i', ref, x: sg(x), y: sg(y), w: q(worldW), h: q(worldW * c.height / c.width) };
+}
+async function importImage(blob, mode){
+  toast(mode === 'img' ? 'Nahrávám obrázek…' : 'Převádím na tahy…'); await frame();
+  const c = await fileToCanvas(blob, mode === 'img' ? 2048 : 1600);
+  const [cx, cy] = viewCenter();
+  const worldW = Math.max(4 * G, Math.min(c.width / 2, W * 0.7 / st.cam.z, 1000));
+  const worldH = worldW * c.height / c.width;
+  if (mode === 'img'){
+    const e = await uploadCanvas(c, worldW, cx - worldW / 2, cy - worldH / 2);
+    commitOp([e]); setTool('lasso'); selectIds([e.id]);
+    toast('Obrázek vložen – tažením ho posuneš, oranžovým rohem změníš velikost');
+  } else {
+    finishTrace(traceCanvas(c, worldW / c.width, cx - worldW / 2, cy - worldH / 2));
+  }
+}
+
+/* --- PDF (pdf.js běží v hlavním vlákně, bez workeru) --- */
+function loadScript(src){ return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('nepodařilo se načíst ' + src)); document.head.appendChild(s); }); }
+let pdfjsP = null;
+function loadPdfJs(){
+  if (!pdfjsP){
+    const base = window.TK_PWA ? 'vendor/pdfjs/' : 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+    pdfjsP = loadScript(base + 'pdf.worker.min.js').then(() => loadScript(base + 'pdf.min.js')).then(() => {
+      const L = window.pdfjsLib; if (!L) throw new Error('pdf.js není dostupné');
+      L.GlobalWorkerOptions.workerSrc = base + 'pdf.worker.min.js';
+      return L;
+    }).catch(e => { pdfjsP = null; throw e; });
+  }
+  return pdfjsP;
+}
+async function importPdf(blob, mode){
+  toast('Načítám PDF…'); await frame();
+  const L = await loadPdfJs();
+  const doc = await L.getDocument({ data: new Uint8Array(await blob.arrayBuffer()), isEvalSupported: false, useSystemFonts: true }).promise;
+  const n = Math.min(doc.numPages, 20);
+  const [cx] = viewCenter();
+  let top = sg(st.cam.y + 90 / st.cam.z);
+  const out = [];
+  for (let i = 1; i <= n; i++){
+    toast('PDF: stránka ' + i + ' z ' + n + (doc.numPages > n ? ' (vkládám prvních 20)' : '')); await frame();
+    const page = await doc.getPage(i);
+    const v1 = page.getViewport({ scale: 1 });
+    const scale = Math.min(4, (mode === 'img' ? 2048 : 1600) / Math.max(v1.width, v1.height));
+    const vp = page.getViewport({ scale });
+    const c = document.createElement('canvas'); c.width = Math.ceil(vp.width); c.height = Math.ceil(vp.height);
+    await page.render({ canvasContext: c.getContext('2d'), viewport: vp, background: mode === 'img' ? 'rgb(255,255,255)' : 'rgba(0,0,0,0)' }).promise;
+    const left = sg(cx - v1.width / 2);
+    if (mode === 'img') out.push(await uploadCanvas(c, v1.width, left, top));
+    else out.push(...traceCanvas(c, v1.width / c.width, left, top));
+    top = sg(top + v1.height + 2 * G);
+    try { page.cleanup(); } catch {}
+  }
+  try { doc.destroy(); } catch {}
+  if (mode === 'img'){
+    commitOp(out); setTool('lasso'); selectIds(out.map(e => e.id));
+    toast(n === 1 ? 'Stránka vložena jako obrázek' : n + ' stránek vloženo jako obrázky');
+  } else finishTrace(out);
+}
+function finishTrace(strokes){
+  if (!strokes.length){ toast('Nenašel jsem žádné čáry.'); return; }
+  commitOp(strokes); setTool('lasso'); selectIds(strokes.map(e => e.id));
+  toast('Převedeno na ' + strokes.length + ' tahů. Ve výběru můžeš dát „Srovnat“ nebo „Na schéma“.');
+}
+
+/* --- vektorizace: obrázek → tahy (ztenčení na středovou čáru, šířka z distanční mapy) --- */
+function traceCanvas(c, sc, ox, oy){
+  const w = c.width, h = c.height, N = w * h;
+  const img = c.getContext('2d').getImageData(0, 0, w, h).data;
+  // pozadí podle okrajů: průhledné, nebo barva okraje
+  let tr = 0, cnt = 0, br = 0, bgc = 0, bb = 0;
+  const smp = (x, y) => { const i = (y * w + x) * 4; cnt++; if (img[i+3] < 128) tr++; else { br += img[i]; bgc += img[i+1]; bb += img[i+2]; } };
+  for (let x = 0; x < w; x += 3){ smp(x, 0); smp(x, h - 1); }
+  for (let y = 0; y < h; y += 3){ smp(0, y); smp(w - 1, y); }
+  const transparent = tr > cnt / 2, op = Math.max(1, cnt - tr), BG = [br / op, bgc / op, bb / op];
+  const M = new Uint8Array(N);
+  let minX = w, minY = h, maxX = -1, maxY = -1;
+  for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++){
+    const p = y * w + x, i = p * 4;
+    if (img[i+3] < 96) continue;
+    if (!transparent && Math.abs(img[i] - BG[0]) + Math.abs(img[i+1] - BG[1]) + Math.abs(img[i+2] - BG[2]) < 110) continue;
+    M[p] = 1; if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y;
+  }
+  if (maxX < 0) return [];
+  const X0 = Math.max(1, minX - 1), X1 = Math.min(w - 2, maxX + 1), Y0 = Math.max(1, minY - 1), Y1 = Math.min(h - 2, maxY + 1);
+  // distanční mapa (vzdálenost k pozadí v px)
+  const D = new Float32Array(N);
+  for (let p = 0; p < N; p++) D[p] = M[p] ? 1e6 : 0;
+  const R2 = Math.SQRT2;
+  for (let y = Y0; y <= Y1; y++) for (let x = X0; x <= X1; x++){
+    const p = y * w + x; if (!M[p]) continue;
+    D[p] = Math.min(D[p], D[p-1] + 1, D[p-w] + 1, D[p-w-1] + R2, D[p-w+1] + R2);
+  }
+  for (let y = Y1; y >= Y0; y--) for (let x = X1; x >= X0; x--){
+    const p = y * w + x; if (!M[p]) continue;
+    D[p] = Math.min(D[p], D[p+1] + 1, D[p+w] + 1, D[p+w+1] + R2, D[p+w-1] + R2);
+  }
+  // ztenčení (Zhang–Suen)
+  const S = M.slice(); const del = [];
+  for (let changed = true; changed;){
+    changed = false;
+    for (let step = 0; step < 2; step++){
+      del.length = 0;
+      for (let y = Y0; y <= Y1; y++) for (let x = X0; x <= X1; x++){
+        const p = y * w + x; if (!S[p]) continue;
+        const p2 = S[p-w], p3 = S[p-w+1], p4 = S[p+1], p5 = S[p+w+1], p6 = S[p+w], p7 = S[p+w-1], p8 = S[p-1], p9 = S[p-w-1];
+        const B = p2 + p3 + p4 + p5 + p6 + p7 + p8 + p9; if (B < 2 || B > 6) continue;
+        const A = (!p2 && p3) + (!p3 && p4) + (!p4 && p5) + (!p5 && p6) + (!p6 && p7) + (!p7 && p8) + (!p8 && p9) + (!p9 && p2);
+        if (A !== 1) continue;
+        if (step === 0 ? (p2 * p4 * p6 || p4 * p6 * p8) : (p2 * p4 * p8 || p2 * p6 * p8)) continue;
+        del.push(p);
+      }
+      if (del.length){ changed = true; for (const p of del) S[p] = 0; }
+    }
+  }
+  // klasifikace pixelů kostry: konec (1 přechod), uzel (3+ přechodů)
+  const RING = [-w - 1, -w, -w + 1, 1, w + 1, w, w - 1, -1];
+  const trans = p => { let t = 0; for (let k = 0; k < 8; k++) if (!S[p + RING[k]] && S[p + RING[(k + 1) % 8]]) t++; return t; };
+  const J = new Uint8Array(N), skel = [];
+  for (let y = Y0; y <= Y1; y++) for (let x = X0; x <= X1; x++){ const p = y * w + x; if (S[p]){ skel.push(p); if (trans(p) >= 3) J[p] = 1; } }
+  const ORDER = [-w, 1, w, -1, -w - 1, -w + 1, w + 1, w - 1];   // nejdřív přímí sousedé
+  const V = new Uint8Array(N), paths = [];
+  function walk(start, first){
+    const path = [start]; let prev = start, cur = first;
+    if (!J[start]) V[start] = 1;
+    for (let guard = 0; guard < N; guard++){
+      path.push(cur);
+      if (J[cur] && cur !== start) break;
+      V[cur] = 1;
+      let nx = -1;
+      for (const o of ORDER){ const q2 = cur + o; if (S[q2] && J[q2] && q2 !== prev && !(q2 === start && path.length < 4)){ nx = q2; break; } }
+      if (nx < 0) for (const o of ORDER){ const q2 = cur + o; if (S[q2] && !J[q2] && !V[q2]){ nx = q2; break; } }
+      if (nx < 0){ for (const o of ORDER) if (cur + o === start && path.length > 3){ path.push(start); break; } break; }
+      prev = cur; cur = nx;
+    }
+    return path;
+  }
+  for (const p of skel) if (!J[p] && !V[p] && trans(p) <= 1){
+    V[p] = 1; let nb = -1; for (const o of ORDER) if (S[p + o]){ nb = p + o; break; }
+    paths.push(nb < 0 ? [p] : walk(p, nb));
+  }
+  for (const p of skel) if (J[p]) for (const o of ORDER){ const q2 = p + o; if (S[q2] && !J[q2] && !V[q2]) paths.push(walk(p, q2)); }
+  for (const p of skel) if (!V[p] && !J[p]){ let nb = -1; for (const o of ORDER) if (S[p + o] && !V[p + o] && !J[p + o]){ nb = p + o; break; } paths.push(nb < 0 ? [p] : walk(p, nb)); }
+  // shluky uzlových pixelů
+  const CL = new Int32Array(N).fill(-1); let ncl = 0;
+  for (const p of skel) if (J[p] && CL[p] < 0){
+    const st2 = [p]; CL[p] = ncl;
+    while (st2.length){ const a = st2.pop(); for (const o of RING){ const b = a + o; if (J[b] && CL[b] < 0){ CL[b] = ncl; st2.push(b); } } }
+    ncl++;
+  }
+  // spojit tahy, které křížením procházejí rovně dál
+  let objs = paths.filter(pa => pa.length >= 1).map(pts => ({ pts, dead: false }));
+  objs = objs.filter(o => !(o.pts.length < 5 && (J[o.pts[0]] !== J[o.pts[o.pts.length - 1]]) && avgD(o.pts) < 2.5));   // výběžky z uzlů
+  function avgD(pts){ let s = 0; for (const p of pts) s += D[p]; return s / pts.length; }
+  const ends = [];
+  const dirAt = (pts, atEnd) => {
+    const n = pts.length, k = Math.min(n - 1, 8);
+    const a = atEnd ? pts[n - 1] : pts[0], b = atEnd ? pts[n - 1 - k] : pts[k];
+    const dx = (a % w) - (b % w), dy = ((a / w) | 0) - ((b / w) | 0), l = Math.hypot(dx, dy) || 1;
+    return [dx / l, dy / l];
+  };
+  for (const o of objs){
+    if (o.pts.length < 3) continue;
+    for (const side of ['s', 'e']){
+      const px = side === 's' ? o.pts[0] : o.pts[o.pts.length - 1];
+      if (CL[px] >= 0) ends.push({ obj: o, side, cl: CL[px], dir: dirAt(o.pts, side === 'e'), used: false });
+    }
+  }
+  const pairs = [];
+  for (let i = 0; i < ends.length; i++) for (let j = i + 1; j < ends.length; j++){
+    if (ends[i].cl !== ends[j].cl) continue;
+    const dot = ends[i].dir[0] * ends[j].dir[0] + ends[i].dir[1] * ends[j].dir[1];
+    if (dot < -0.8) pairs.push([dot, ends[i], ends[j]]);
+  }
+  pairs.sort((a, b) => a[0] - b[0]);
+  for (const [, E1, E2] of pairs){
+    if (E1.used || E2.used || E1.obj === E2.obj || E1.obj.dead || E2.obj.dead) continue;
+    const A = E1.side === 'e' ? E1.obj.pts : E1.obj.pts.slice().reverse();
+    const B = E2.side === 's' ? E2.obj.pts : E2.obj.pts.slice().reverse();
+    const nobj = { pts: A.concat(B), dead: false };
+    E1.used = E2.used = true; E1.obj.dead = E2.obj.dead = true;
+    for (const E of ends){
+      if (E.used) continue;
+      if (E.obj === E1.obj){ E.obj = nobj; E.side = 's'; }
+      else if (E.obj === E2.obj){ E.obj = nobj; E.side = 'e'; }
+    }
+    objs.push(nobj);
+  }
+  // body → tahy v souřadnicích plochy
+  const out = [];
+  for (const o of objs){
+    if (o.dead) continue;
+    let pts = [];
+    for (const p of o.pts){ const x = p % w + 0.5, y = ((p / w) | 0) + 0.5; if (!pts.length || pts[pts.length - 1][0] !== x || pts[pts.length - 1][1] !== y) pts.push([x, y, D[p]]); }
+    const meanR = pts.reduce((s2, a) => s2 + a[2], 0) / pts.length;
+    if (pts.length < 3 && meanR < 1.4) continue;                      // šum
+    for (let it = 0; it < 2 && pts.length > 4; it++) pts = pts.map((a, i) => (i === 0 || i === pts.length - 1) ? a : [(pts[i-1][0] + a[0] * 2 + pts[i+1][0]) / 4, (pts[i-1][1] + a[1] * 2 + pts[i+1][1]) / 4, a[2]]);
+    const keep = pts.length > 2 ? rdp(pts, 0.55) : pts.map((_, i) => i);
+    // barva tahu
+    let cr = 0, cg = 0, cb = 0, cn = 0;
+    for (const p of o.pts){ const i = p * 4; if (img[i+3] > 96){ cr += img[i]; cg += img[i+1]; cb += img[i+2]; cn++; } }
+    let col = 'k';
+    if (cn){ cr /= cn; cg /= cn; cb /= cn; const mx = Math.max(cr, cg, cb), mn = Math.min(cr, cg, cb); if (!(mx < 90 && mx - mn < 45)) col = '#' + [cr, cg, cb].map(v => Math.round(v).toString(16).padStart(2, '0')).join(''); }
+    const rW = Math.max(0.35, meanR - 0.25) * sc;
+    const ww = clamp(2 * rW, 0.6, 40);
+    const P = [];
+    for (const i of keep){ const [x, y, d] = pts[i]; const r = Math.max(0.35, d - 0.25) * sc; P.push(q(ox + x * sc), q(oy + y * sc), Math.round(clamp((r / (ww / 2) - 0.45) / 1.1, 0.03, 1) * 100)); }
+    out.push({ id: rid(), v: nv(), k: 's', t: 'pen', c: col, w: q(ww) || 0.75, p: P });
+  }
+  return out;
+}
+
+/* --- srovnání ručních tahů na čáry a tvary --- */
+function shapeFromRec(r, e, P, step){
+  const n = P.length / 3; let avg = 0; for (let i = 0; i < n; i++) avg += P[i*3+2]; avg = avg / n / 100;
+  const base = { id: e.id, v: nv(), k: 's', t: 'pen', c: e.c, w: Math.max(0.8, radius(e.w, avg) * 2) };
+  if (r.kind === 'line'){
+    let bx = P[(n-1)*3], by = P[(n-1)*3+1]; if (step){ bx = sg(bx); by = sg(by); }
+    if (Math.hypot(bx - r.ax, by - r.ay) < 1) return null;
+    return { ...base, line: 1, p: [q(r.ax), q(r.ay), 50, q(bx), q(by), 50] };
+  }
+  if (r.kind === 'arrow') return { ...base, ar: 1, p: r.p };
+  return { ...base, poly: 1, cl: 1, p: r.p };
+}
+function snapStep(P){                       // malé tvary (písmena) na tečky nepřichytávat – zdeformovaly by se
+  if (!st.snap) return 0;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (let i = 0; i < P.length; i += 3){ x0 = Math.min(x0, P[i]); x1 = Math.max(x1, P[i]); y0 = Math.min(y0, P[i+1]); y1 = Math.max(y1, P[i+1]); }
+  return Math.hypot(x1 - x0, y1 - y0) >= 4 * G ? G : 0;
+}
+/* spojí tahy, které na sebe navazují (např. strany obdélníku rozdělené při převodu z obrázku) */
+function chainStrokes(list){
+  const ends = [];
+  for (const e of list){
+    const n = e.p.length / 3, k = Math.min(n - 1, 4);
+    for (const side of [0, 1]){
+      const i = side ? n - 1 : 0, j = side ? n - 1 - k : k;
+      const dx = e.p[i*3] - e.p[j*3], dy = e.p[i*3+1] - e.p[j*3+1], l = Math.hypot(dx, dy) || 1;
+      ends.push({ e, side, x: e.p[i*3], y: e.p[i*3+1], dir: [dx / l, dy / l], link: null, tol: Math.max(9 / st.cam.z, e.w * 4), minor: strokeLen(e) < Math.max(3 * e.w, 8 / st.cam.z) });
+    }
+  }
+  const seen = new Set();
+  for (const a of ends){
+    if (seen.has(a)) continue;
+    const cl = ends.filter(b => !seen.has(b) && Math.hypot(a.x - b.x, a.y - b.y) <= Math.max(a.tol, b.tol));
+    cl.forEach(b => seen.add(b));
+    let live = cl.filter(b => !(cl.length === 2 && cl[0].e === cl[1].e));
+    if (live.length >= 3){ const major = live.filter(b => !b.minor); if (major.length >= 2) live = major; }   // krátké výběžky ignorovat
+    if (live.length === 2){ live[0].link = live[1]; live[1].link = live[0]; }
+    else if (live.length >= 3){
+      let best = null, bd = -0.7;
+      for (let i = 0; i < live.length; i++) for (let j = i + 1; j < live.length; j++){
+        if (live[i].e === live[j].e) continue;
+        const d = live[i].dir[0] * live[j].dir[0] + live[i].dir[1] * live[j].dir[1];
+        if (d < bd){ bd = d; best = [live[i], live[j]]; }
+      }
+      if (best){ best[0].link = best[1]; best[1].link = best[0]; }
+    }
+  }
+  const endOf = (e, side) => ends.find(x => x.e === e && x.side === side);
+  const done = new Set(), chains = [];
+  const build = (startE, startSide) => {
+    const members = [], P = []; let e = startE, side = startSide, closed = false;
+    while (e && !done.has(e)){
+      done.add(e); members.push(e);
+      const pts = side === 0 ? e.p : pairs3rev(e.p);
+      for (let i = 0; i < pts.length; i += 3) P.push(pts[i], pts[i+1], pts[i+2]);
+      const out = endOf(e, 1 - side).link;
+      if (!out) break;
+      if (out.e === startE){ closed = true; break; }
+      e = out.e; side = out.side;
+    }
+    return { members, P, closed };
+  };
+  for (const a of ends) if (!a.link && !done.has(a.e)) chains.push(build(a.e, a.side));
+  for (const e of list) if (!done.has(e)) chains.push(build(e, 0));
+  return chains;
+}
+function strokeLen(e){ let l = 0; for (let i = 3; i < e.p.length; i += 3) l += Math.hypot(e.p[i] - e.p[i-3], e.p[i+1] - e.p[i-2]); return l; }
+function pairs3rev(p){ const o = []; for (let i = p.length - 3; i >= 0; i -= 3) o.push(p[i], p[i+1], p[i+2]); return o; }
+function straightenSel(){
+  const free = [...selection].map(id => items.get(id)).filter(isFree);
+  if (!free.length){ toast('Ve výběru nejsou ručně kreslené tahy.'); return; }
+  const out = [], handled = new Set();
+  for (const ch of chainStrokes(free)){                 // nejdřív celé navazující řetězy (obdélník z několika kusů)
+    if (ch.members.length < 2) continue;
+    const step = snapStep(ch.P), r = recognize(ch.P, st.cam.z, step);
+    if (!r || r.kind === 'arrow') continue;
+    const sh = shapeFromRec(r, ch.members[0], ch.P, step); if (!sh) continue;
+    out.push(sh); ch.members.forEach((m, i) => { handled.add(m.id); if (i) out.push({ id: m.id, k: 'd', v: nv() }); });
+  }
+  for (const e of free){
+    if (handled.has(e.id)) continue;
+    const step = snapStep(e.p), r = recognize(e.p, st.cam.z, step); if (!r) continue;
+    const sh = shapeFromRec(r, e, e.p, step); if (sh){ out.push(sh); handled.add(e.id); }
+  }
+  commitOp(out); updateSelBB(); requestDraw();
+  toast(handled.size ? 'Srovnáno ' + handled.size + ' z ' + free.length + ' tahů (Zpět vrátí původní)' : 'Žádný z tahů nevypadá jako čára ani tvar.');
+}
+
+/* --- převod nakresleného schématu na značky a vodiče (rozpoznání pomocí Claude) --- */
+const ORIENT = {
+  'b:diode': 'anode left, cathode bar right', 'b:led': 'anode left, cathode bar right', 'b:zener': 'anode left, cathode bar right',
+  'b:npn': 'base left, collector top, emitter bottom (arrow out)', 'b:pnp': 'base left, collector top, emitter bottom (arrow in)',
+  'b:opamp': 'inputs left (minus top, plus bottom), output right', 'b:gnd': 'single pin at top, bars below',
+  'b:term': 'single pin on the left', 'b:ecap': 'plus plate left', 'b:bat': 'long (+) plate left'
+};
+function symDesc(d){
+  if (ORIENT[d.id]) return ORIENT[d.id];
+  if (d.pins.length === 2){ const [a, b] = d.pins; return Math.abs(a[1] - b[1]) <= Math.abs(a[0] - b[0]) ? 'pins left and right' : 'pins top and bottom'; }
+  return d.pins.length + ' pins';
+}
+async function schemaSel(){
+  if (!sampleCap){ toast('Převod na schéma je dostupný jen ve verzi v claude.ai.'); return; }
+  const strokes = [...selection].map(id => items.get(id)).filter(e => e && e.k === 's' && e.t !== 'hl' && !e.wi);
+  if (strokes.length < 2){ toast('Vyber lasem celé nakreslené schéma – součástky i spoje.'); return; }
+  let bb = null; for (const e of strokes){ const b = geom(e).bb; bb = bb ? { x0: Math.min(bb.x0, b.x0), y0: Math.min(bb.y0, b.y0), x1: Math.max(bb.x1, b.x1), y1: Math.max(bb.y1, b.y1) } : { ...b }; }
+  const pad = 24, S = Math.min(4, 1000 / Math.max(bb.x1 - bb.x0, bb.y1 - bb.y0, 1));
+  const toI = (x, y) => [Math.round((x - bb.x0) * S + pad), Math.round((y - bb.y0) * S + pad)];
+  const cw = Math.ceil((bb.x1 - bb.x0) * S + 2 * pad), ch = Math.ceil((bb.y1 - bb.y0) * S + 2 * pad);
+  const c = document.createElement('canvas'); c.width = cw; c.height = ch; const g2 = c.getContext('2d');
+  g2.fillStyle = '#fff'; g2.fillRect(0, 0, cw, ch); g2.strokeStyle = '#000'; g2.lineWidth = 3; g2.lineCap = g2.lineJoin = 'round';
+  const data = strokes.map((e, i) => {
+    const pts = pairs3(e.p).map(([x, y]) => toI(x, y));
+    g2.beginPath(); g2.moveTo(pts[0][0], pts[0][1]); for (const p of pts) g2.lineTo(p[0], p[1]); g2.stroke();
+    const keep = pts.length > 2 ? rdp(pts, 2) : pts.map((_, k) => k);
+    return keep.map(k => pts[k]);
+  });
+  g2.font = 'bold 15px sans-serif'; g2.fillStyle = '#d00';
+  data.forEach((pts, i) => g2.fillText(String(i), pts[0][0] + 4, pts[0][1] - 4));
+  const blob = await new Promise(res => c.toBlob(res, 'image/png'));
+  const lib = symList().map(d => '- ' + d.id + ': ' + d.name + ' (' + symDesc(d) + ')').join('\n');
+  const prompt = 'You convert a hand-drawn electrical schematic (European IEC/ČSN EN 60617 style) into library symbols.\n'
+    + 'The attached image shows the drawing; every stroke is labelled with a small red number at its start. '
+    + 'Stroke polylines in image pixel coordinates (x right, y down):\n'
+    + data.map((pts, i) => '#' + i + ': ' + JSON.stringify(pts)).join('\n')
+    + '\n\nLibrary symbols and their default orientation (rot 0):\n' + lib
+    + '\n\nRules:\n- Group the strokes that together draw one component and choose the best matching symbol id. Short stubs directly attached to a component body belong to that component.'
+    + '\n- Lines that connect components (or lead to a junction or an open end) are wires, even if they touch a component body.'
+    + '\n- Text, labels, values, arrows that are annotations and anything you cannot match go to "other".'
+    + '\n- rot = clockwise rotation from the default orientation: 0, 90, 180 or 270. mirror = true only for a mirror image.'
+    + '\n- Every stroke number must appear exactly once in the answer.'
+    + '\nReply with only JSON: {"components":[{"sid":"b:res","strokes":[0,1],"rot":0,"mirror":false}],"wires":[2,3],"other":[4]}';
+  let caps = null; try { caps = await sampleCap.limits(); } catch {}
+  toast('Rozpoznávám schéma… (může to trvat i půl minuty)');
+  let res;
+  try { res = await sampleCap.json(prompt, { images: caps && caps.images ? [blob] : undefined, modelTier: 'default' }); }
+  catch (e){
+    const code = e && e.code;
+    toast(code === 'not_granted' ? 'Bez povolení Claude převod nejde. Zkus to znovu a povol ho.' : code === 'rate_limited' ? 'Moc požadavků najednou – zkus to za chvíli.' : code === 'invalid_json' ? 'Rozpoznání se nepovedlo. Zkus to znovu.' : 'Rozpoznání selhalo (' + (code || 'chyba') + ').');
+    return;
+  }
+  if (!res || typeof res !== 'object'){ toast('Rozpoznání nevrátilo použitelný výsledek.'); return; }
+  const used = new Set(), comps = [], newSyms = [];
+  const idxOk = i => Number.isInteger(i) && i >= 0 && i < strokes.length && !used.has(i);
+  for (const cp of Array.isArray(res.components) ? res.components : []){
+    if (!cp || !getDef(cp.sid) || !Array.isArray(cp.strokes)) continue;
+    const ss = cp.strokes.filter(idxOk); if (!ss.length) continue;
+    ss.forEach(i => used.add(i));
+    let cb = null; for (const i of ss){ const b = geom(strokes[i]).bb; cb = cb ? { x0: Math.min(cb.x0, b.x0), y0: Math.min(cb.y0, b.y0), x1: Math.max(cb.x1, b.x1), y1: Math.max(cb.y1, b.y1) } : { ...b }; }
+    const r = ((Math.round((+cp.rot || 0) / 90) % 4) + 4) % 4, m = cp.mirror ? 1 : 0;
+    const gb = symGeom({ k: 'y', sid: cp.sid, x: 0, y: 0, r, m }).bb;
+    const item = { id: rid(), v: nv(), k: 'y', sid: cp.sid, x: sg((cb.x0 + cb.x1) / 2 - (gb.x0 + gb.x1) / 2), y: sg((cb.y0 + cb.y1) / 2 - (gb.y0 + gb.y1) / 2), r, m, c: strokes[ss[0]].c || 'k' };
+    newSyms.push(item); comps.push({ item, bb: cb, pins: symGeom(item).pins });
+  }
+  const attach = P => {
+    let best = null, bd = Infinity;
+    for (const cpn of comps){
+      const b = cpn.bb, mg = Math.max(1.5 * G, 0.35 * Math.max(b.x1 - b.x0, b.y1 - b.y0));
+      if (P[0] < b.x0 - mg || P[0] > b.x1 + mg || P[1] < b.y0 - mg || P[1] > b.y1 + mg) continue;
+      cpn.pins.forEach((pn, k) => { const d = Math.hypot(pn[0] - P[0], pn[1] - P[1]); if (d < bd){ bd = d; best = { pt: pn, att: { s: cpn.item.id, i: k }, item: cpn.item }; } });
+    }
+    return best;
+  };
+  const freeEnds = [];
+  const freePt = P => { let pt = [sg(P[0]), sg(P[1])]; for (const f of freeEnds) if (Math.hypot(f[0] - pt[0], f[1] - pt[1]) <= 1.5 * G){ pt = f; break; } if (!freeEnds.includes(pt)) freeEnds.push(pt); return pt; };
+  const wires = [];
+  for (const i of (Array.isArray(res.wires) ? res.wires : []).filter(idxOk)){
+    used.add(i);
+    const e = strokes[i], n = e.p.length / 3, A = [e.p[0], e.p[1]], B = [e.p[(n-1)*3], e.p[(n-1)*3+1]];
+    const ta = attach(A), tb = attach(B);
+    let pa = ta ? ta.pt : freePt(A), pb = tb ? tb.pt : freePt(B);
+    const align = (pin, item, i, fr) => { const o = pinOut(item, i); const k = o[0] ? 1 : 0; return Math.abs(fr[k] - pin[k]) <= 1.5 * G ? (k ? [fr[0], pin[1]] : [pin[0], fr[1]]) : fr; };
+    if (ta && !tb) pb = align(pa, ta.item, ta.att.i, pb);
+    if (tb && !ta) pa = align(pb, tb.item, tb.att.i, pa);
+    if (pa[0] === pb[0] && pa[1] === pb[1]) continue;
+    let route;
+    if (ta) route = routeFromPin(pa, pinOut(ta.item, ta.att.i), pb);
+    else if (tb) route = routeFromPin(pb, pinOut(tb.item, tb.att.i), pa).reverse();
+    else { const k = Math.min(n - 1, 4); route = routeL(pa, pb, Math.abs(e.p[k*3] - A[0]) >= Math.abs(e.p[k*3+1] - A[1])); }
+    const wEnt = { id: rid(), v: nv(), k: 's', t: 'pen', wi: 1, poly: 1, c: e.c || 'k', w: WIRE_W, p: flat3(route) };
+    if (ta) wEnt.a = ta.att; if (tb) wEnt.b = tb.att;
+    wires.push(wEnt);
+  }
+  if (!newSyms.length && !wires.length){ toast('Ve výběru jsem nepoznal žádnou součástku ani spoj.'); return; }
+  const dels = [...used].map(i => ({ id: strokes[i].id, k: 'd', v: nv() }));
+  commitOp([...dels, ...newSyms, ...wires]);
+  selectIds([...newSyms, ...wires].map(e => e.id));
+  const rest = strokes.length - used.size;
+  toast('Převedeno: ' + newSyms.length + ' součástek, ' + wires.length + ' vodičů' + (rest ? ', ' + rest + ' tahů ponecháno' : '') + '. Zpět vrátí kresbu.');
+}
+
+/* --- obrázky v exportu / importu --- */
+async function blobToDataURL(b){ return new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(b); }); }
+async function exportImages(chunksByPage){
+  const out = {};
+  for (const its of Object.values(chunksByPage)) for (const e of its){
+    if (e.k !== 'i' || out[e.ref]) continue;
+    try { const r = await fetch(await imgApi.src(e.ref)); if (r.ok) out[e.ref] = await blobToDataURL(await r.blob()); } catch {}
+  }
+  return out;
+}
+async function importImages(map){
+  const remap = {};
+  if (!map || !imgApi || !imgApi.upload) return remap;
+  for (const [ref, url] of Object.entries(map)){
+    if (typeof url !== 'string' || !/^data:image\/(png|jpeg|webp);base64,/.test(url)) continue;
+    try { const b = await (await fetch(url)).blob(); remap[ref] = await imgApi.upload(b); } catch {}
+  }
+  return remap;
+}
+
+/* ================= start ================= */
+function use(name){
+  try { return (window.claude && typeof window.claude.use === 'function') ? Promise.resolve(window.claude.use(name)).catch(() => null) : Promise.resolve(null); }
+  catch { return Promise.resolve(null); }
+}
+async function boot(){
+  readTheme(); applyTheme(); resize(); syncToggles(); setTool('pen'); updZoom();
+  window.addEventListener('resize', resize);
+  st.hash = readHash();
+  let env = null;
+  if (window.TK_PWA){
+    env = await window.TK_PWA.connect({ toast });          // vlastní aplikace: Supabase + přihlášení
+    if (env && window.TK_PWA.images) imgApi = window.TK_PWA.images;
+  } else {
+    const [db, user, rm] = await Promise.all([use('db'), use('user'), use('room')]);
+    if (db) env = { store: dbStore(db), user, room: rm };
+    downloadsCap = await use('downloads');
+    const assets = await use('assets');
+    sampleCap = await use('sample');
+    imgApi = { upload: assets ? async b => (await assets.upload(b)).id : null, src: async ref => '/_blob/' + ref };
+  }
+  if (env){
+    store = env.store; userCap = env.user; room = env.room || null;
+    if (userCap){
+      try { st.uid = await userCap.id(); } catch {}
+      try { const cw = await userCap.can('data.write'); if (cw === false) st.readOnly = true; } catch {}
+    }
+  } else {
+    store = localStore(); room = null;
+    toast('Synchronizace není dostupná – ukládám jen v tomto zařízení.');
+  }
+  renderAcct();
+  if (st.readOnly) setReadOnly(true); else refreshSync();
+  const fail = () => { toast('Data se nepodařilo načíst. Obnov stránku.'); $('#boot').classList.add('off'); };
+  store.watch('books', onBooksRaw, fail);
+  store.watch('pages', onPagesRaw, fail);
+  store.watch('symbols', onSymbols, () => {});
+}
+
+/* ================= účet, export a import dat ================= */
+let downloadsCap = null;
+function acctRow(label, small, btnText, fn){
+  const row = document.createElement('div'); row.className = 'row';
+  const d = document.createElement('div'); d.textContent = label;
+  if (small){ const sm = document.createElement('small'); sm.textContent = small; d.appendChild(sm); }
+  row.appendChild(d);
+  if (btnText){ const b = document.createElement('button'); b.className = 'btn'; b.textContent = btnText; b.onclick = fn; row.appendChild(b); }
+  return row;
+}
+function renderAcct(){
+  const box = $('#acct'); box.textContent = '';
+  if (window.TK_PWA){
+    const info = window.TK_PWA.account();
+    if (info){
+      box.appendChild(acctRow('Přihlášen', info.email, 'Odhlásit', () => window.TK_PWA.logout()));
+      box.appendChild(acctRow('Jméno pro ostatní', info.name, 'Změnit', async () => {
+        const n = await dialog({ title: 'Jméno, které uvidí ostatní', input: info.name, ok: 'Uložit' });
+        if (n && n.trim()){ await window.TK_PWA.setName(n.trim().slice(0, 40)); renderAcct(); toast('Jméno uloženo'); }
+      }));
+      box.appendChild(acctRow('Heslo', '', 'Změnit', async () => {
+        const pw = await dialog({ title: 'Nové heslo', text: 'Alespoň 8 znaků.', input: '', ok: 'Uložit' });
+        if (pw == null) return; if (pw.length < 8){ toast('Heslo musí mít alespoň 8 znaků.'); return; }
+        try { await window.TK_PWA.setPassword(pw); toast('Heslo změněno'); } catch (e){ toast('Heslo se nepodařilo změnit: ' + (e.message || e)); }
+      }));
+      if (!st.readOnly) box.appendChild(acctRow('Import dat', 'Soubor exportovaný z verze v claude.ai', 'Importovat', importData));
+    }
+  } else if (store && store.getChunks && downloadsCap){
+    box.appendChild(acctRow('Export dat', 'Všechny sešity, stránky a značky pro vlastní aplikaci', 'Exportovat', exportData));
+  }
+}
+function latestItems(docs){
+  const m = new Map();
+  for (const d of docs) if (d && Array.isArray(d.items)) for (const e of d.items){ if (!valid(e)) continue; const c = m.get(e.id); if (!c || e.v > c.v) m.set(e.id, e); }
+  return [...m.values()].filter(e => e.k !== 'd');
+}
+async function exportData(){
+  hidePop();
+  try {
+    toast('Připravuji export…');
+    const strip = d => { const o = { ...d }; delete o.id; return o; };
+    const pages = rawPages.filter(p => p && !p.deleted);
+    const out = { app: 'teckovnik', version: 1, exportedAt: new Date().toISOString(),
+      books: rawBooks.filter(b => b && !b.deleted).map(b => ({ id: b.id, data: strip(b) })),
+      pages: pages.map(p => ({ id: p.id, data: strip(p) })),
+      symbols: rawSymbols.filter(s => s && !s.deleted).map(s => ({ id: s.id, data: strip(s) })),
+      chunks: {} };
+    let n = 0;
+    for (const p of pages){ out.chunks[p.id] = latestItems(await store.getChunks(p.id)); n += out.chunks[p.id].length; toast('Export: ' + Object.keys(out.chunks).length + ' / ' + pages.length + ' stránek'); }
+    if (imgApi){ toast('Export: obrázky…'); out.images = await exportImages(out.chunks); }
+    const json = JSON.stringify(out);
+    await downloadsCap.save({ filename: 'teckovnik-export-' + new Date().toISOString().slice(0, 10) + '.json', data: new Blob([json], { type: 'application/json' }) });
+    toast('Exportováno: ' + pages.length + ' stránek, ' + n + ' objektů');
+  } catch (e){
+    if (e && e.code === 'declined') toast('Export zrušen');
+    else toast('Export se nepovedl: ' + ((e && (e.message || e.code)) || e));
+  }
+}
+function importData(){
+  hidePop();
+  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.json,application/json';
+  inp.onchange = async () => {
+    const f = inp.files && inp.files[0]; if (!f) return;
+    let data;
+    try { data = JSON.parse(await f.text()); } catch { toast('Soubor není platný export Tečkovníku.'); return; }
+    if (!data || data.app !== 'teckovnik' || !Array.isArray(data.pages)){ toast('Soubor není export Tečkovníku.'); return; }
+    const ok = await dialog({ title: 'Importovat data?', text: 'Přidá se ' + (data.books || []).length + ' sešitů, ' + data.pages.length + ' stránek a ' + (data.symbols || []).length + ' vlastních značek. Stejné položky se přepíšou.', ok: 'Importovat' });
+    if (!ok) return;
+    const safeId = v => typeof v === 'string' && /^[A-Za-z0-9_.:-]{1,60}$/.test(v);
+    try {
+      const remap = await importImages(data.images);
+      for (const b of data.books || []) if (safeId(b.id) && b.data && typeof b.data.title === 'string') await store.set('books/' + b.id, b.data);
+      for (const s2 of data.symbols || []) if (safeId(s2.id) && s2.data && sanitizeSym(s2.id, s2.data)) await store.set('symbols/' + s2.id, s2.data);
+      let i = 0;
+      for (const p of data.pages){
+        if (!safeId(p.id) || !p.data || typeof p.data.title !== 'string') continue;
+        await store.set('pages/' + p.id, p.data);
+        const its = ((data.chunks || {})[p.id] || []).filter(valid).map(e => e.k === 'i' && remap[e.ref] ? { ...e, ref: remap[e.ref] } : e);
+        let part = [], size = 0, n = 0;
+        const flushPart = async () => { if (!part.length) return; await store.saveChunk(p.id, 'import-' + n, { u: 'import', n, items: part }); n++; part = []; size = 0; };
+        for (const e of its){ part.push(e); size += JSON.stringify(e).length; if (size > CHUNK_LIMIT) await flushPart(); }
+        await flushPart();
+        toast('Import: ' + (++i) + ' / ' + data.pages.length + ' stránek');
+      }
+      toast('Import hotový. Stránky najdeš v seznamu sešitů.');
+    } catch (e){ onWriteErrorPage(e); }
+  };
+  inp.click();
+}
+boot();
+})();
+</script>
+</body>
+</html>
